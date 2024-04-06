@@ -2,7 +2,7 @@ import time
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QColor, QPainter, QBrush, QPen, QFont, QPainterPath, QRegion, QPixmap, QImage
 from PyQt5.QtWidgets import QLabel, QPushButton, QGraphicsView, QGraphicsEllipseItem, QGraphicsDropShadowEffect, \
-    QGraphicsPixmapItem, QGraphicsRectItem, QApplication
+    QGraphicsPixmapItem, QGraphicsRectItem, QApplication, QTextEdit
 
 import utilis
 
@@ -42,40 +42,43 @@ class Addons:
         w.setPos(-500,0)
         self.scene.setBackgroundBrush(QColor(utilis.BG_COLOR))
 
+        self.mode_info()
+        self.turn_label()
+        self.input_window()
+        self.mode_buttons()
+        self.circles()
+        self.time_labels()
+
+
+    def mode_info(self):
         self.max_time_label = QLabel()
         self.max_time_label.setText(f'Max time : {self.window.max_time} min')
         self.max_time_label.setFont(QFont("Arial", 12,weight=QFont.Bold))
         self.max_time_label.resize(200, 60)
+        self.max_time_label.setAutoFillBackground(True)
         palette = self.max_time_label.palette()
         palette.setColor(self.max_time_label.backgroundRole(), QColor("#f2e5dd"))
         self.max_time_label.setPalette(palette)
-        self.max_time_label.setStyleSheet(utilis.STYLE_LABEL)
-        t = self.scene.addWidget(self.max_time_label)
-        t.setPos(-200, 650)
+        path = QPainterPath()
+        rect = QRectF(self.max_time_label.rect())
+        path.addRoundedRect(rect, 10, 10)
+        polygon = path.toFillPolygon().toPolygon()
+        self.max_time_label.setMask(QRegion(polygon))
 
-        self.turn_label()
-        self.mode_buttons()
-        self.circles()
-        self.time_labels()
+        self.max_time_label.setStyleSheet(utilis.STYLE_LABEL)
+        self.max_time_label.setAlignment(Qt.AlignCenter)
+
+        t = self.scene.addWidget(self.max_time_label)
+        t.setPos(200, 720)
 
     def load_bg(self):
         background_image = QImage("assets/bg1.jpg")
 
         background_pixmap = QGraphicsPixmapItem(QPixmap.fromImage(background_image))
         background_pixmap.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
-        screen_width = QApplication.desktop().width()
-
-        # scale_factor_x = (screen_width-50) / background_image.width()
-        # background_pixmap.setScale(scale_factor_x)
         background_pixmap.setPos(-600, -200)
-
         self.scene.addItem(background_pixmap)
         background_pixmap.setZValue(-1)
-
-        # background_brush = QBrush(background_pixmap)
-        #
-        #
-        # self.scene.setBackgroundBrush(background_brush)
 
     def turn_label(self):
         self.turn = QLabel()
@@ -101,7 +104,10 @@ class Addons:
         turn = self.scene.addWidget(self.turn)
         turn.setPos(200, -100)
 
-
+    def input_window(self):
+        self.text_edit = QTextEdit()
+        text = self.scene.addWidget(self.text_edit)
+        text.setPos(700,0)
 
     def update_turn(self):
         if self.window.move %2 == 0:

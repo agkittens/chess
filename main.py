@@ -72,6 +72,7 @@ class Window(QGraphicsView):
 
         from addons import Addons
         self.addons = Addons(self)
+        self.input = ''
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.addons.update_time)
@@ -120,7 +121,34 @@ class Window(QGraphicsView):
                 self.scene.addItem(rect_item)
 
 
+    def retrieve_text(self):
+        text = self.addons.text_edit.toPlainText()
+        print("Retrieved text:", text)
+        self.addons.text_edit.clear()
 
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+            self.retrieve_text()
+        else:
+            super().keyPressEvent(event)
+    #
+    # def input_move(self,pos):
+    #     x,y = self.find_pos(pos)
+    #
+    #     if x is None and y is None: return
+    #
+    #     if self.dragging_item is None:
+    #         if not self.check_if_empty(x,y):
+    #
+    #
+    #
+
+    def find_pos(self,pos):
+        for i, row in enumerate(self.figures.pos_board):
+            for j, element in enumerate(row):
+                if element == pos:
+                    return i, j
+        return None, None
 
     def show_figures(self):
         for i in range(len(self.figures.figures_board)):
@@ -220,34 +248,35 @@ class Window(QGraphicsView):
             pass
 
         else:
-            item_data = item_clicked.data(Qt.UserRole)
-            if self.move%2==0 and item_data[-1] == 'w':
+            try:
+                item_data = item_clicked.data(Qt.UserRole)
+                if self.move%2==0 and item_data[-1] == 'w':
 
-                self.highlight(item_data, x, y)
-                self.dragging_item = item_clicked
-                self.change_fig_pos(None, pos_y, pos_x)
+                    self.highlight(item_data, x, y)
+                    self.dragging_item = item_clicked
+                    self.change_fig_pos(None, pos_y, pos_x)
 
-                self.move += 1
-                self.last_pos = [int(self.dragging_item.x() / self.slot_w),
-                                 int(self.dragging_item.y() / self.slot_h)]
+                    self.move += 1
+                    self.last_pos = [int(self.dragging_item.x() / self.slot_w),
+                                     int(self.dragging_item.y() / self.slot_h)]
 
-                self.queue.put(f"last pos {self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]}\n")
+                    self.queue.put(f"last pos {self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]}\n")
 
-            elif self.move%2==1 and item_data[-1] == 'b':
+                elif self.move%2==1 and item_data[-1] == 'b':
 
-                self.highlight(item_data, x, y)
-                self.dragging_item = item_clicked
-                self.change_fig_pos(None, pos_y, pos_x)
+                    self.highlight(item_data, x, y)
+                    self.dragging_item = item_clicked
+                    self.change_fig_pos(None, pos_y, pos_x)
 
-                self.move+=1
+                    self.move+=1
 
-                self.last_pos = [int(self.dragging_item.x()/self.slot_w),
-                                 int(self.dragging_item.y()/self.slot_h)]
+                    self.last_pos = [int(self.dragging_item.x()/self.slot_w),
+                                     int(self.dragging_item.y()/self.slot_h)]
 
 
-                self.queue.put(f"last pos {self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]}\n")
-            else: pass
+                    self.queue.put(f"last pos {self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]}\n")
 
+            except TypeError : pass
 
 
     def move_img(self,event):
@@ -263,7 +292,7 @@ class Window(QGraphicsView):
 
 
 
-    def swap(self,x,y,side):
+    def swap(self,x,side):
         if x!=7 and x!=0:
             return False
 
@@ -309,7 +338,7 @@ class Window(QGraphicsView):
                     elif pos_x <4: side = 'l'
 
                     if side !='':
-                        if self.swap(self.last_pos[1], self.last_pos[0], side):
+                        if self.swap(self.last_pos[1], side):
                             mov = 0
                             mov_r = 0
                             r_pos = 0
@@ -522,7 +551,7 @@ class Window(QGraphicsView):
                     val_y = 0
 
                 if curr_x+val_x in range(8) and curr_y + val_y in range(8):
-                    if self.check_if_empty(curr_y + val_y, curr_x + val_x,key):
+                    if self.check_if_empty(curr_y + val_y, curr_x + val_x):
                         rect1 = QGraphicsRectItem(x + val_x* self.slot_w, y+val_y*self.slot_h, self.slot_w, self.slot_h)
                         rect1.setBrush(color)
                         rect1.setZValue(0)
