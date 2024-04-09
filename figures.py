@@ -59,3 +59,13 @@ class Figure(QGraphicsItem):
 
             return True
 
+    def reset_board(self):
+        self.figures_board = [['rb', 'knb', 'bb', 'qb', 'kb', 'bb', 'knb', 'rb'],
+                              ['pb', 'pb', 'pb', 'pb', 'pb', 'pb', 'pb', 'pb'],
+                              [None, None, None, None, None, None, None, None],
+                              [None, None, None, None, None, None, None, None],
+                              [None, None, None, None, None, None, None, None],
+                              [None, None, None, None, None, None, None, None],
+                              ['pw', 'pw', 'pw', 'pw', 'pw', 'pw', 'pw', 'pw'],
+                              ['rw', 'knw', 'bw', 'qw', 'kw', 'bw', 'knw', 'rw']
+                              ]

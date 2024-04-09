@@ -24,6 +24,13 @@ from queue import Queue
 #2pkt zegar - 1pkt pojawienie, 1pkt tryby
 #1pkt notacja szachowa - okienko i sterowanie
 
+#0.5pkt tryb rozgrywki: przeciwnik ai lub gracz radiobuttons
+#0.5pkt komunikacja po sieci - miejsce: adres ip, port
+#1pkt zapis historii gry w bazie danych
+#1pkt zapis w formacie xml
+#1pkt zapis opcji w json
+#1pkt odczyt i playback historii rozgrywki
+
 
 class Window(QGraphicsView):
     def __init__(self):
@@ -43,6 +50,10 @@ class Window(QGraphicsView):
         self.mode = 0
         self.max_time = 15
 
+        self.opponent = 'player'
+        self.ip = ''
+        self.port = ''
+        self.stream_data = []
 
         self.title = "Chess"
         self.width = self.height = 600
@@ -58,6 +69,7 @@ class Window(QGraphicsView):
         self.slot_h = self.height/self.slots
 
         self.save = [""]
+        self.game_history = [""]
 
 
         self.board = [[0, 1, 0, 1, 0, 1, 0, 1],
@@ -79,9 +91,11 @@ class Window(QGraphicsView):
         self.timer.start(1000)
         self.start_time = time.time()
 
+
+        self.check = QTimer()
+        self.timer.timeout.connect(self.loaded_input)
+
         self.create_window()
-
-
 
     def create_window(self):
 
@@ -92,6 +106,7 @@ class Window(QGraphicsView):
         self.setScene(self.scene)
 
         self.create_chessboard()
+        self.figures.reset_board()
         self.show_figures()
 
         self.scene.mousePressEvent = self.drag
@@ -125,23 +140,70 @@ class Window(QGraphicsView):
         text = self.addons.text_edit.toPlainText()
         print("Retrieved text:", text)
         self.addons.text_edit.clear()
+        self.input_move(text[:2],text[3:])
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
             self.retrieve_text()
         else:
             super().keyPressEvent(event)
-    #
-    # def input_move(self,pos):
-    #     x,y = self.find_pos(pos)
-    #
-    #     if x is None and y is None: return
-    #
-    #     if self.dragging_item is None:
-    #         if not self.check_if_empty(x,y):
-    #
-    #
-    #
+
+    def loaded_input(self):
+        if self.addons.is_loaded:
+            self.move_index = 0
+            QTimer.singleShot(0, self.exec_move)
+
+            # for moves in self.stream_data:
+            #     for move in moves:
+            #         if move != '':
+            #             self.input_move(move[:2],move[3:])
+            #
+            #     QTimer.singleShot(3000, self.loaded_input())
+            # self.addons.is_loaded = False
+
+
+    def exec_move(self):
+        if self.move_index < len(self.stream_data):
+            moves = self.stream_data[self.move_index]
+            for move in moves:
+                if move != '':
+                    self.input_move(move[:2], move[3:])
+
+            self.move_index += 1
+            QTimer.singleShot(2000,self.exec_move)
+
+        else:
+            self.addons.is_loaded = False
+
+
+    def input_move(self,pos_s, pos_e):
+        x_s,y_s = self.find_pos(pos_s)
+        x_e,y_e = self.find_pos(pos_e)
+
+        if x_s is None and y_s is None: return
+        if x_e is None and y_e is None: return
+
+        if not self.check_if_empty(x_s,y_s) and self.check_if_empty(x_e,y_e):
+            key = self.figures.figures_board[x_s][y_s]
+            if self.move%2==0 and key[-1]!='w': return
+            elif self.move%2==1 and key[-1]!='b': return
+
+            x,y = y_s*75+8, x_s*75+8
+            self.highlight(key,x,y)
+            xe,ye = y_e*75+8, x_e*75+8
+
+
+            if self.check_existance(xe,ye) or self.check_attack_exist(xe,ye):
+                self.change_fig_pos(None,x_s,y_s)
+                item = self.scene.itemAt(x+30,y+30, self.transform())
+
+                item.setPos(xe,ye)
+                self.change_fig_pos(key,x_e,y_e)
+                self.move+=1
+
+            self.remove_highlights()
+
+
 
     def find_pos(self,pos):
         for i, row in enumerate(self.figures.pos_board):
@@ -149,6 +211,7 @@ class Window(QGraphicsView):
                 if element == pos:
                     return i, j
         return None, None
+
 
     def show_figures(self):
         for i in range(len(self.figures.figures_board)):
@@ -188,8 +251,27 @@ class Window(QGraphicsView):
 
     def delete_attacked(self,x,y):
         figures = self.define_objects_at(x+30,y+30,1,1)
-        self.scene.removeItem(figures[1])
 
+        if self.move%2==1:
+            self.scene.removeItem(figures[1])
+        if self.move%2==0:
+            self.scene.removeItem(figures[0])
+
+
+    def check_mate(self):
+        key = 'kb'
+        if self.move%2 == 0: key = 'kw'
+
+        slot = (0,0)
+        for row_idx, row in enumerate(self.figures.figures_board):
+            for piece_idx, piece in enumerate(row):
+                if piece == key:
+                    slot = (8+piece_idx*75, 8+row_idx*75)
+                    break
+
+        for highlight in self.highlights_attack:
+            if highlight.rect().contains(QPointF(*slot)):
+                pass
 
     def end_game(self):
         king_w = False
@@ -233,6 +315,8 @@ class Window(QGraphicsView):
 
 
     def drag(self,event):
+        self.loaded_input()
+
         pos = event.scenePos()
         x,y,pos_x,pos_y = self.convert_pos(pos.x(), pos.y())
 
@@ -260,7 +344,9 @@ class Window(QGraphicsView):
                     self.last_pos = [int(self.dragging_item.x() / self.slot_w),
                                      int(self.dragging_item.y() / self.slot_h)]
 
-                    self.queue.put(f"last pos {self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]}\n")
+                    chess_pos = self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]
+                    self.queue.put(f"last pos {chess_pos}\n")
+                    self.game_history.append(f"{item_data}: {chess_pos} ")
 
                 elif self.move%2==1 and item_data[-1] == 'b':
 
@@ -274,7 +360,9 @@ class Window(QGraphicsView):
                                      int(self.dragging_item.y()/self.slot_h)]
 
 
-                    self.queue.put(f"last pos {self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]}\n")
+                    chess_pos = self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]
+                    self.queue.put(f"last pos {chess_pos}\n")
+                    self.game_history.append(f"{item_data}: {chess_pos} ")
 
             except TypeError : pass
 
@@ -361,7 +449,11 @@ class Window(QGraphicsView):
                             else:
                                 items[0].setPos(*new_pos_r)
 
-                self.queue.put(f" new pos {self.figures.pos_board[pos_y][pos_x]}\n")
+
+                chess_pos = self.figures.pos_board[pos_y][pos_x]
+
+                self.queue.put(f" new pos {chess_pos}\n")
+                self.game_history[-1] += f"{chess_pos}"
 
                 self.dragging_item.setPos(*new_pos)
 
@@ -372,15 +464,16 @@ class Window(QGraphicsView):
                 max = self.max_time*60
 
                 if not self.end_game() or self.white_time>=max or self.black_time>=max:
-                    time.sleep(2.0)
+                    time.sleep(5.0)
                     self.close()
 
-
-
+                print(self.game_history)
+                self.highlight(self.dragging_item.data(Qt.UserRole),x,y)
+                self.check_mate()
                 self.remove_highlights()
+
+
                 self.dragging_item = None
-
-
 
 
             elif not self.check_existance(x,y):
@@ -406,158 +499,170 @@ class Window(QGraphicsView):
         self.highlight_current(x,y,self.slot_w,self.slot_h)
 
         if (key=='pw' or key == 'pb'):
-            if key[-1] == 'w': val = -1
+            self.pawn_move(x,y,key,curr_x, curr_y,val,color)
 
-            if (curr_x+1) in range(0,8) and (curr_x-1) in range(0,8):
+        if key=='rw' or key =='rb' or key=="qw" or key=="qb":
+            self.rook_move(x,y,key,curr_x, curr_y,val,color)
 
-                if not self.check_if_empty(curr_y+val,curr_x+1):
-                    self.check_attack(x+self.slot_w,y+val*self.slot_w,key)
+        if key == 'bw' or key == 'bb'or key=="qw" or key=="qb":
+            self.bishop_move(x,y,key,curr_x, curr_y,val,color)
 
-                if not self.check_if_empty(curr_y+val,curr_x-1):
-                    self.check_attack(x-self.slot_w,y++val*self.slot_w,key)
+        if key == 'knw' or key=='knb':
+            self.knight_move(x,y,key,curr_x, curr_y,val,color)
 
-            if self.check_if_empty(curr_y+val,curr_x):
-                rect1 = QGraphicsRectItem(x, y+val*self.slot_h, self.slot_w, self.slot_h)
+        if key == "kw" or key == "kb":
+            self.king_move(x,y,key,curr_x, curr_y,val,color)
+
+
+    def pawn_move(self,x,y,key,curr_x,curr_y,val,color):
+        if key[-1] == 'w': val = -1
+
+        if (curr_x + 1) in range(0, 8) and (curr_x - 1) in range(0, 8):
+
+            if not self.check_if_empty(curr_y + val, curr_x + 1):
+                self.check_attack(x + self.slot_w, y + val * self.slot_w, key)
+
+            if not self.check_if_empty(curr_y + val, curr_x - 1):
+                self.check_attack(x - self.slot_w, y + +val * self.slot_w, key)
+
+        if self.check_if_empty(curr_y + val, curr_x):
+            rect1 = QGraphicsRectItem(x, y + val * self.slot_h, self.slot_w, self.slot_h)
+            rect1.setBrush(color)
+            rect1.setZValue(0)
+            self.scene.addItem(rect1)
+            self.highlights.append(rect1)
+
+            if (y == val * self.slot_h or y == self.height + 2 * val * self.slot_h) and self.check_if_empty(
+                    curr_y + 2 * val, curr_x):
+                rect2 = QGraphicsRectItem(x, y + 2 * val * self.slot_h, self.slot_w, self.slot_h)
+                rect2.setBrush(color)
+                rect2.setZValue(0)
+                self.scene.addItem(rect2)
+                self.highlights.append(rect2)
+
+
+    def rook_move(self,x,y,key,curr_x,curr_y,val,color):
+        for slot in range(curr_y + 1, self.slots):
+            if not self.check_if_empty(slot, curr_x):
+                self.check_attack(x, self.slot_h * slot, key)
+                break
+
+            rect1 = QGraphicsRectItem(x, val * self.slot_h * slot, self.slot_w, self.slot_h)
+            rect1.setBrush(color)
+            rect1.setZValue(0)
+
+            if y != val * self.slot_h * slot:
+                self.scene.addItem(rect1)
+                self.highlights.append(rect1)
+
+        for slot in range(curr_y - 1, -1, -1):
+            if not self.check_if_empty(slot, curr_x):
+                self.check_attack(x, self.slot_h * slot, key)
+                break
+            rect1 = QGraphicsRectItem(x, val * self.slot_h * slot, self.slot_w, self.slot_h)
+            rect1.setBrush(color)
+            rect1.setZValue(0)
+
+            if y != val * self.slot_h * slot:
+                self.scene.addItem(rect1)
+                self.highlights.append(rect1)
+
+        for slot in range(curr_x - 1, -1, -1):
+            if not self.check_if_empty(curr_y, slot):
+                self.check_attack(self.slot_w * slot, y, key)
+                break
+
+            rect2 = QGraphicsRectItem(slot * val * self.slot_w, y, self.slot_w, self.slot_h)
+            rect2.setBrush(color)
+            rect2.setZValue(0)
+
+            if x != slot * val * self.slot_w:
+                self.scene.addItem(rect2)
+                self.highlights.append(rect2)
+
+        for slot in range(curr_x + 1, self.slots):
+            if not self.check_if_empty(curr_y, slot):
+                self.check_attack(self.slot_w * slot, y, key)
+                break
+            rect2 = QGraphicsRectItem(slot * val * self.slot_w, y, self.slot_w, self.slot_h)
+            rect2.setBrush(color)
+            rect2.setZValue(0)
+
+            if x != slot * val * self.slot_w:
+                self.scene.addItem(rect2)
+                self.highlights.append(rect2)
+
+
+    def bishop_move(self,x,y,key,curr_x,curr_y,val,color):
+        for _ in range(4):
+            val_x = val * (-1) ** _
+            val_y = val * (-1) ** (_ // 2)
+
+            for slot in range(1, self.slots):
+
+                if curr_y + val_y * slot in range(self.slots) and curr_x + val_x * slot in range(self.slots):
+                    if not self.check_if_empty(curr_y + val_y * slot, curr_x + val_x * slot):
+                        self.check_attack(x + self.slot_w * slot * val_x, y + self.slot_h * slot * val_y, key)
+                        break
+
+                    rect1 = QGraphicsRectItem(x + val_x * self.slot_w * slot, y + val_y * self.slot_h * slot,
+                                              self.slot_w, self.slot_h)
+                    rect1.setBrush(color)
+                    rect1.setZValue(0)
+
+                    if y != y + val_y * self.slot_h * slot and x != x + val_x * self.slot_w * slot:
+                        self.scene.addItem(rect1)
+                        self.highlights.append(rect1)
+
+
+    def knight_move(self,x,y,key,curr_x,curr_y,val,color):
+        for _ in range(4):
+            val_x = val * (-1) ** _
+            val_y = val * (-1) ** (_ // 2)
+
+            if curr_y + 2 * val_y in range(self.slots) and curr_x + val_x in range(self.slots):
+                if not self.check_if_empty(curr_y + 2 * val_y, curr_x + val_x):
+                    self.check_attack(x + val_x * self.slot_w, y + 2 * val_y * self.slot_h, key)
+                    break
+
+                rect1 = QGraphicsRectItem(x + val_x * self.slot_w, y + 2 * val_y * self.slot_h, self.slot_w,
+                                          self.slot_h)
                 rect1.setBrush(color)
                 rect1.setZValue(0)
                 self.scene.addItem(rect1)
                 self.highlights.append(rect1)
 
-                if (y == val*self.slot_h or y== self.height+2*val*self.slot_h) and self.check_if_empty(curr_y+2*val,curr_x):
-                    rect2 = QGraphicsRectItem(x, y+2*val*self.slot_h,  self.slot_w, self.slot_h)
-                    rect2.setBrush(color)
-                    rect2.setZValue(0)
-                    self.scene.addItem(rect2)
-                    self.highlights.append(rect2)
+            if curr_y + val_y in range(self.slots) and curr_x + 2 * val_x in range(self.slots):
 
-
-
-        if key=='rw' or key =='rb' or key=="qw" or key=="qb":
-
-            for slot in range(curr_y+1,self.slots):
-                if not self.check_if_empty(slot,curr_x):
-                    self.check_attack(x, self.slot_h*slot,key)
+                if not self.check_if_empty(curr_y + val_y, curr_x + 2 * val_x):
+                    self.check_attack(x + 2 * val_x * self.slot_w, y + val_y * self.slot_h, key)
                     break
 
-                rect1= QGraphicsRectItem(x, val*self.slot_h*slot, self.slot_w, self.slot_h)
-                rect1.setBrush(color)
-                rect1.setZValue(0)
-
-
-                if y != val*self.slot_h*slot:
-                    self.scene.addItem(rect1)
-                    self.highlights.append(rect1)
-
-
-            for slot in range(curr_y-1,-1,-1):
-                if not self.check_if_empty(slot,curr_x):
-                    self.check_attack(x, self.slot_h*slot,key)
-                    break
-                rect1= QGraphicsRectItem(x, val*self.slot_h*slot, self.slot_w, self.slot_h)
-                rect1.setBrush(color)
-                rect1.setZValue(0)
-
-                if y != val*self.slot_h*slot:
-                    self.scene.addItem(rect1)
-                    self.highlights.append(rect1)
-
-
-            for slot in range(curr_x-1,-1,-1):
-                if not self.check_if_empty(curr_y,slot):
-                    self.check_attack(self.slot_w*slot,y,key)
-                    break
-
-                rect2 = QGraphicsRectItem(slot*val*self.slot_w, y, self.slot_w, self.slot_h)
+                rect2 = QGraphicsRectItem(x + 2 * val_x * self.slot_w, y + val_y * self.slot_h, self.slot_w,
+                                          self.slot_h)
                 rect2.setBrush(color)
                 rect2.setZValue(0)
-
-                if x != slot*val*self.slot_w:
-                    self.scene.addItem(rect2)
-                    self.highlights.append(rect2)
+                self.scene.addItem(rect2)
+                self.highlights.append(rect2)
 
 
-            for slot in range(curr_x+1,self.slots):
-                if not self.check_if_empty(curr_y,slot):
-                    self.check_attack(self.slot_w*slot,y,key)
-                    break
-                rect2 = QGraphicsRectItem(slot*val*self.slot_w, y, self.slot_w, self.slot_h)
-                rect2.setBrush(color)
-                rect2.setZValue(0)
+    def king_move(self,x,y,key,curr_x,curr_y,val,color):
+        for _ in range(8):
+            val_x = val * (-1) ** _
+            val_y = val * (-1) ** (_ // 2)
+            if _ == 0 or _ == 3:
+                val_x = 0
+            if _ == 1 or _ == 2:
+                val_y = 0
 
-                if x != slot*val*self.slot_w:
-                    self.scene.addItem(rect2)
-                    self.highlights.append(rect2)
-
-
-
-        if key == 'bw' or key == 'bb'or key=="qw" or key=="qb":
-            for _ in range(4):
-                val_x = val * (-1) ** _
-                val_y = val * (-1) ** (_//2)
-
-
-                for slot in range(1,self.slots):
-
-                    if curr_y+val_y*slot in range(self.slots) and curr_x+val_x*slot in range(self.slots):
-                        if not self.check_if_empty(curr_y+val_y*slot,curr_x+val_x*slot):
-                            self.check_attack(x+ self.slot_w * slot*val_x, y+ self.slot_h * slot*val_y, key)
-                            break
-
-                        rect1= QGraphicsRectItem(x+val_x*self.slot_w*slot, y+val_y*self.slot_h*slot, self.slot_w, self.slot_h)
-                        rect1.setBrush(color)
-                        rect1.setZValue(0)
-
-                        if y != y + val_y*self.slot_h*slot and x != x+val_x*self.slot_w*slot:
-                            self.scene.addItem(rect1)
-                            self.highlights.append(rect1)
-
-
-        if key == 'knw' or key=='knb':
-            for _ in range(4):
-                val_x = val * (-1) ** _
-                val_y = val * (-1) ** (_ // 2)
-
-                if curr_y + 2*val_y in range(self.slots) and curr_x + val_x in range(self.slots):
-                    if not self.check_if_empty(curr_y + 2*val_y , curr_x+val_x):
-                        self.check_attack(x + val_x * self.slot_w, y + 2*val_y * self.slot_h, key)
-                        break
-
-                    rect1 = QGraphicsRectItem(x + val_x * self.slot_w, y + 2*val_y * self.slot_h, self.slot_w, self.slot_h)
+            if curr_x + val_x in range(8) and curr_y + val_y in range(8):
+                if self.check_if_empty(curr_y + val_y, curr_x + val_x):
+                    rect1 = QGraphicsRectItem(x + val_x * self.slot_w, y + val_y * self.slot_h, self.slot_w,
+                                              self.slot_h)
                     rect1.setBrush(color)
                     rect1.setZValue(0)
                     self.scene.addItem(rect1)
                     self.highlights.append(rect1)
-
-                if curr_y + val_y in range(self.slots) and curr_x + 2*val_x in range(self.slots):
-
-                    if not self.check_if_empty(curr_y + val_y , curr_x+2*val_x):
-                        self.check_attack(x + 2*val_x * self.slot_w, y + val_y * self.slot_h, key)
-                        break
-
-                    rect2 = QGraphicsRectItem(x + 2*val_x * self.slot_w, y + val_y * self.slot_h, self.slot_w, self.slot_h)
-                    rect2.setBrush(color)
-                    rect2.setZValue(0)
-                    self.scene.addItem(rect2)
-                    self.highlights.append(rect2)
-
-
-        if key == "kw" or key == "kb":
-            for _ in range(8):
-                val_x = val * (-1) ** _
-                val_y = val * (-1) ** (_ // 2)
-                if _ == 0 or _ == 3:
-                    val_x = 0
-                if _ == 1 or _ == 2:
-                    val_y = 0
-
-                if curr_x+val_x in range(8) and curr_y + val_y in range(8):
-                    if self.check_if_empty(curr_y + val_y, curr_x + val_x):
-                        rect1 = QGraphicsRectItem(x + val_x* self.slot_w, y+val_y*self.slot_h, self.slot_w, self.slot_h)
-                        rect1.setBrush(color)
-                        rect1.setZValue(0)
-                        self.scene.addItem(rect1)
-                        self.highlights.append(rect1)
-
 
 
     def remove_highlights(self):

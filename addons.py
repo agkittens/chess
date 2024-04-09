@@ -1,10 +1,15 @@
+import json
+import random
+from datetime import datetime
 import time
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QColor, QPainter, QBrush, QPen, QFont, QPainterPath, QRegion, QPixmap, QImage
 from PyQt5.QtWidgets import QLabel, QPushButton, QGraphicsView, QGraphicsEllipseItem, QGraphicsDropShadowEffect, \
-    QGraphicsPixmapItem, QGraphicsRectItem, QApplication, QTextEdit
+    QGraphicsPixmapItem, QGraphicsRectItem, QApplication, QTextEdit, QRadioButton, QDialog, QVBoxLayout, QMessageBox
 
 import utilis
+import sqlite3
+import xml.etree.ElementTree as ET
 
 
 class Addons:
@@ -13,6 +18,8 @@ class Addons:
         self.save = self.window.save
         self.queue = self.window.queue
         self.scene = self.window.scene
+        self.last_db = ""
+        self.is_loaded = False
 
 
     def mode1(self):
@@ -36,18 +43,44 @@ class Addons:
         self.load_bg()
         self.label = QLabel()
         self.label.setText('Game history')
-        self.label.resize(200,200)
+        self.label.resize(200,100)
         self.label.setStyleSheet(utilis.STYLE_LABEL)
         w = self.scene.addWidget(self.label)
-        w.setPos(-500,0)
+        w.setPos(-500,100)
         self.scene.setBackgroundBrush(QColor(utilis.BG_COLOR))
 
+
+
+        self.data_buttons()
         self.mode_info()
         self.turn_label()
         self.input_window()
         self.mode_buttons()
+        self.save_buttons()
         self.circles()
         self.time_labels()
+
+    def data_buttons(self):
+        self.config_button = QPushButton("Config", self.window)
+        self.config_button.resize(120,60)
+        self.config_button.move(1350,100)
+        self.config_button.clicked.connect(self.configuration_window)
+        shadow_effect = QGraphicsDropShadowEffect()
+        shadow_effect.setBlurRadius(15)
+        shadow_effect.setColor(QColor(145, 90, 87, 127))
+        shadow_effect.setOffset(0, 7)
+        self.config_button.setGraphicsEffect(shadow_effect)
+
+        self.load_button = QPushButton("Load", self.window)
+        self.load_button.resize(120,60)
+        self.load_button.move(1500,100)
+        self.load_button.clicked.connect(self.load_data)
+        shadow_effect_l = QGraphicsDropShadowEffect()
+        shadow_effect_l.setBlurRadius(15)
+        shadow_effect_l.setColor(QColor(145, 90, 87, 127))
+        shadow_effect_l.setOffset(0, 7)
+        self.load_button.setGraphicsEffect(shadow_effect_l)
+
 
 
     def mode_info(self):
@@ -205,7 +238,7 @@ class Addons:
             self.save.append(self.queue.get())
 
             self.label.setText('\n'.join(self.save))
-            self.label.resize(200, 200)
+            self.label.resize(200, 100)
 
 
     def update_time(self):
@@ -227,3 +260,166 @@ class Addons:
         self.black_time_label.setText('BLACK\n' + f'{b_m}' + ':' + f'{b_s} ')
 
         self.window.start_time = time.time()
+
+
+    def save_buttons(self):
+        self.mode4_button = QPushButton("SQL", self.window)
+        self.mode5_button = QPushButton("XML", self.window)
+        self.mode6_button = QPushButton("JSON", self.window)
+
+        self.mode4_button.resize(120, 60)
+        self.mode5_button.resize(120, 60)
+        self.mode6_button.resize(120, 60)
+
+        self.mode4_button.clicked.connect(self.save_sql)
+        self.mode5_button.clicked.connect(self.save_xml)
+        self.mode6_button.clicked.connect(self.save_json)
+
+        self.mode4_button.move(100, 100)
+        self.mode5_button.move(250, 100)
+        self.mode6_button.move(400, 100)
+
+        shadow_effect4 = QGraphicsDropShadowEffect()
+        shadow_effect4.setBlurRadius(15)
+        shadow_effect4.setColor(QColor(145, 90, 87, 127))
+        shadow_effect4.setOffset(0, 7)
+        self.mode4_button.setGraphicsEffect(shadow_effect4)
+
+        shadow_effect5 = QGraphicsDropShadowEffect()
+        shadow_effect5.setBlurRadius(15)
+        shadow_effect5.setColor(QColor(145, 90, 87, 127))
+        shadow_effect5.setOffset(0, 7)
+        self.mode5_button.setGraphicsEffect(shadow_effect5)
+
+        shadow_effect6 = QGraphicsDropShadowEffect()
+        shadow_effect6.setBlurRadius(15)
+        shadow_effect6.setColor(QColor(145, 90, 87, 127))
+        shadow_effect6.setOffset(0, 7)
+        self.mode6_button.setGraphicsEffect(shadow_effect6)
+
+        self.window.setStyleSheet(utilis.STYLE_BUTTON)
+
+    def save_sql(self):
+        try:
+            conn = sqlite3.connect('gameplay.db')
+            cursor = conn.cursor()
+            date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            table_name = f'gameplay_{date.replace("-", "_").replace(":", "_").replace(" ", "_")}'
+            self.last_db = table_name
+            create_table_query = f'''
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                id INTEGER PRIMARY KEY,
+                white TEXT,
+                black TEXT
+            )'''
+
+            cursor.execute(create_table_query)
+
+            for value in self.window.game_history[1:]:
+                if value[1] == 'w':
+                    cursor.execute(f"INSERT INTO {table_name} (white, black) VALUES (?,?)", (value[4:],''))
+                if value[1] == 'b':
+                    cursor.execute(f"INSERT INTO {table_name} (white, black) VALUES (?,?)", ('',value[4:]))
+            conn.commit()
+            conn.close()
+
+            print("saved")
+
+        except sqlite3.Error as e:
+            print('error', e)
+
+
+    def save_xml(self):
+        with open("gameplay.xml", "w") as xml_file:
+
+            game_element = ET.Element("last game")
+            for move in self.window.game_history[1:]:
+                move_element = ET.SubElement(game_element, "move")
+                sub_element = ET.SubElement(move_element, move[:2])
+                sub_element.text = move[3:]
+
+            xml_file.write(ET.tostring(game_element, encoding="unicode", method="xml"))
+
+
+    def save_json(self):
+        data = {
+                "opponent": self.window.opponent,
+                "ip": self.window.ip,
+                "port": self.window.port,
+                "mode": self.window.max_time}
+
+        with open("gameplay_config.json", "w") as file:
+            json.dump(data, file)
+
+
+    def configuration_window(self):
+        popup = PopUp()
+        if popup.exec_() == QDialog.Accepted:
+            self.window.opponent = popup.select_option()
+            self.window.ip, self.window.port = popup.get_address()
+
+
+    def load_data(self):
+        conn = sqlite3.connect('gameplay.db')
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        tables = cursor.fetchall()
+
+        if not tables:
+            return
+
+        random_table = random.choice(tables)[0]
+        print(random_table)
+
+        cursor.execute(f"SELECT white, black FROM {random_table}")
+        data = cursor.fetchall()
+        print(data)
+        conn.close()
+
+        if data:
+            self.window.stream_data = data
+            self.is_loaded = True
+        else:
+            pass
+
+
+class PopUp(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        layout = QVBoxLayout()
+
+        self.radio_button1 = QRadioButton("with player")
+        self.radio_button2 = QRadioButton("with ai")
+        layout.addWidget(self.radio_button1)
+        layout.addWidget(self.radio_button2)
+
+        self.ok_button = QPushButton("OK")
+        self.ok_button.clicked.connect(self.accept)
+        layout.addWidget(self.ok_button)
+
+        self.ip = QTextEdit()
+        layout.addWidget(self.ip)
+
+        self.port = QTextEdit()
+        layout.addWidget(self.port)
+        self.setLayout(layout)
+
+    def select_option(self):
+        if self.radio_button1.isChecked():
+            return 'player'
+        if self.radio_button2.isChecked():
+            return 'ai'
+        else: return 'player'
+
+
+    def get_address(self):
+        ip = self.ip.toPlainText()
+        port = self.port.toPlainText()
+        self.ip.clear()
+        self.port.clear()
+
+        return ip,port
+
+
