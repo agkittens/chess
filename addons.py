@@ -3,9 +3,10 @@ import random
 from datetime import datetime
 import time
 from PyQt5.QtCore import Qt, QRectF
-from PyQt5.QtGui import QColor, QPainter, QBrush, QPen, QFont, QPainterPath, QRegion, QPixmap, QImage
-from PyQt5.QtWidgets import QLabel, QPushButton, QGraphicsView, QGraphicsEllipseItem, QGraphicsDropShadowEffect, \
-    QGraphicsPixmapItem, QGraphicsRectItem, QApplication, QTextEdit, QRadioButton, QDialog, QVBoxLayout, QMessageBox
+from PyQt5.QtGui import QColor, QFont, QPainterPath, QRegion, QPixmap, QImage
+from PyQt5.QtWidgets import QLabel, QPushButton, QGraphicsEllipseItem, QGraphicsDropShadowEffect, \
+    QGraphicsPixmapItem, QTextEdit, QRadioButton, QDialog, QVBoxLayout, \
+    QCheckBox
 
 import utilis
 import sqlite3
@@ -15,27 +16,27 @@ import xml.etree.ElementTree as ET
 class Addons:
     def __init__(self, window):
         self.window = window
-        self.save = self.window.save
-        self.queue = self.window.queue
+        self.save = self.window.game.save
+        self.queue = self.window.game.queue
         self.scene = self.window.scene
         self.last_db = ""
         self.is_loaded = False
 
 
     def mode1(self):
-        self.window.mode=0
-        self.window.max_time = 15
-        self.max_time_label.setText(f'Max time : {self.window.max_time} min')
+        self.window.game.mode=0
+        self.window.game.max_time = 15
+        self.max_time_label.setText(f'Max time : {self.window.game.max_time} min')
 
     def mode2(self):
-        self.window.mode=1
-        self.window.max_time = 5
-        self.max_time_label.setText(f'Max time : {self.window.max_time} min')
+        self.window.game.mode=1
+        self.window.game.max_time = 5
+        self.max_time_label.setText(f'Max time : {self.window.game.max_time} min')
 
     def mode3(self):
-        self.window.mode=2
-        self.window.max_time = 45
-        self.max_time_label.setText(f'Max time : {self.window.max_time} min')
+        self.window.game.mode=2
+        self.window.game.max_time = 45
+        self.max_time_label.setText(f'Max time : {self.window.game.max_time} min')
 
 
 
@@ -48,8 +49,6 @@ class Addons:
         w = self.scene.addWidget(self.label)
         w.setPos(-500,100)
         self.scene.setBackgroundBrush(QColor(utilis.BG_COLOR))
-
-
 
         self.data_buttons()
         self.mode_info()
@@ -81,11 +80,19 @@ class Addons:
         shadow_effect_l.setOffset(0, 7)
         self.load_button.setGraphicsEffect(shadow_effect_l)
 
-
+        self.connect_button = QPushButton("Connect", self.window)
+        self.connect_button.resize(120,60)
+        self.connect_button.move(1650,100)
+        self.connect_button.clicked.connect(self.window.game.server_connect)
+        shadow_effect_c = QGraphicsDropShadowEffect()
+        shadow_effect_c.setBlurRadius(15)
+        shadow_effect_c.setColor(QColor(145, 90, 87, 127))
+        shadow_effect_c.setOffset(0, 7)
+        self.connect_button.setGraphicsEffect(shadow_effect_c)
 
     def mode_info(self):
         self.max_time_label = QLabel()
-        self.max_time_label.setText(f'Max time : {self.window.max_time} min')
+        self.max_time_label.setText(f'Max time : {self.window.game.max_time} min')
         self.max_time_label.setFont(QFont("Arial", 12,weight=QFont.Bold))
         self.max_time_label.resize(200, 60)
         self.max_time_label.setAutoFillBackground(True)
@@ -143,9 +150,9 @@ class Addons:
         text.setPos(700,0)
 
     def update_turn(self):
-        if self.window.move %2 == 0:
+        if self.window.game.move %2 == 0:
             self.turn.setText("WHITE'S TURN")
-        elif self.window.move %2 == 1:
+        elif self.window.game.move %2 == 1:
             self.turn.setText("BLACK'S TURN")
 
 
@@ -242,24 +249,24 @@ class Addons:
 
 
     def update_time(self):
-        end_time = time.time() - self.window.start_time
+        end_time = time.time() - self.window.game.start_time
 
         if self.window.dragging_item is None: return
         if self.window.dragging_item.data(Qt.UserRole)[-1] == 'w':
-            self.window.white_time += end_time
+            self.window.game.white_time += end_time
 
         if self.window.dragging_item.data(Qt.UserRole)[-1] == 'b':
-            self.window.black_time += end_time
+            self.window.game.black_time += end_time
 
-        w_m = int(self.window.white_time // 60)
-        w_s = int(self.window.white_time % 60)
+        w_m = int(self.window.game.white_time // 60)
+        w_s = int(self.window.game.white_time % 60)
         self.white_time_label.setText('WHITE\n' + f'{w_m}' + ':' + f'{w_s} ')
 
-        b_m = int(self.window.black_time // 60)
-        b_s = int(self.window.black_time % 60)
+        b_m = int(self.window.game.black_time // 60)
+        b_s = int(self.window.game.black_time % 60)
         self.black_time_label.setText('BLACK\n' + f'{b_m}' + ':' + f'{b_s} ')
 
-        self.window.start_time = time.time()
+        self.window.game.start_time = time.time()
 
 
     def save_buttons(self):
@@ -315,7 +322,7 @@ class Addons:
 
             cursor.execute(create_table_query)
 
-            for value in self.window.game_history[1:]:
+            for value in self.window.game.game_history[1:]:
                 if value[1] == 'w':
                     cursor.execute(f"INSERT INTO {table_name} (white, black) VALUES (?,?)", (value[4:],''))
                 if value[1] == 'b':
@@ -333,7 +340,7 @@ class Addons:
         with open("gameplay.xml", "w") as xml_file:
 
             game_element = ET.Element("last game")
-            for move in self.window.game_history[1:]:
+            for move in self.window.game.game_history[1:]:
                 move_element = ET.SubElement(game_element, "move")
                 sub_element = ET.SubElement(move_element, move[:2])
                 sub_element.text = move[3:]
@@ -343,10 +350,10 @@ class Addons:
 
     def save_json(self):
         data = {
-                "opponent": self.window.opponent,
-                "ip": self.window.ip,
-                "port": self.window.port,
-                "mode": self.window.max_time}
+                "opponent": self.window.game.opponent,
+                "ip": self.window.game.ip,
+                "port": self.window.game.port,
+                "mode": self.window.game.max_time}
 
         with open("gameplay_config.json", "w") as file:
             json.dump(data, file)
@@ -355,8 +362,14 @@ class Addons:
     def configuration_window(self):
         popup = PopUp()
         if popup.exec_() == QDialog.Accepted:
-            self.window.opponent = popup.select_option()
-            self.window.ip, self.window.port = popup.get_address()
+            self.window.game.opponent = popup.select_option()
+            self.window.game.ip, self.window.game.port = popup.get_address()
+
+            self.window.game.status_tcpip = popup.select_type()
+            print(self.window.game.status_tcpip)
+
+            if self.window.game.status_tcpip!="" and self.window.game.opponent=='player':
+                self.window.connect()
 
 
     def load_data(self):
@@ -370,11 +383,9 @@ class Addons:
             return
 
         random_table = random.choice(tables)[0]
-        print(random_table)
 
         cursor.execute(f"SELECT white, black FROM {random_table}")
         data = cursor.fetchall()
-        print(data)
         conn.close()
 
         if data:
@@ -392,8 +403,10 @@ class PopUp(QDialog):
 
         self.radio_button1 = QRadioButton("with player")
         self.radio_button2 = QRadioButton("with ai")
+        self.radio_button3 = QCheckBox("server")
         layout.addWidget(self.radio_button1)
         layout.addWidget(self.radio_button2)
+        layout.addWidget(self.radio_button3)
 
         self.ok_button = QPushButton("OK")
         self.ok_button.clicked.connect(self.accept)
@@ -412,6 +425,11 @@ class PopUp(QDialog):
         if self.radio_button2.isChecked():
             return 'ai'
         else: return 'player'
+
+    def select_type(self):
+        if self.radio_button3.isChecked():
+            return 'server'
+        else: return 'client'
 
 
     def get_address(self):
