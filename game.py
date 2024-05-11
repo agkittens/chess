@@ -20,7 +20,7 @@ class Game:
         self.mode = 0
         self.max_time = 15
 
-        self.opponent = 'player'
+        self.opponent = 'ai'
         self.ip = 'localhost'
         self.port = 8888
         self.stream_data = []
@@ -29,59 +29,6 @@ class Game:
         self.game_history = [""]
 
 
-    def input_move(self,pos_s, pos_e):
-        x_s,y_s = self.window.find_pos(pos_s)
-        x_e,y_e = self.window.find_pos(pos_e)
-
-        if x_s is None and y_s is None: return
-        if x_e is None and y_e is None: return
-
-        if not self.window.check_if_empty(x_s,y_s) and self.window.check_if_empty(x_e,y_e):
-            key = self.window.figures.figures_board[x_s][y_s]
-            if self.move%2==0 and key[-1]!='w': return
-            elif self.move%2==1 and key[-1]!='b': return
-
-            x,y = y_s*75+8, x_s*75+8
-            self.window.highlight(key,x,y)
-            xe,ye = y_e*75+8, x_e*75+8
-
-
-            if self.window.check_existance(xe,ye) or self.window.check_attack_exist(xe,ye):
-                self.window.change_fig_pos(None,x_s,y_s)
-                item = self.window.scene.itemAt(x+30,y+30, self.window.transform())
-
-                item.setPos(xe,ye)
-                self.window.change_fig_pos(key,x_e,y_e)
-                self.move+=1
-
-            self.window.remove_highlights()
-
-        elif not self.window.check_if_empty(x_s,y_s) and not self.window.check_if_empty(x_e,y_e):
-            key = self.window.figures.figures_board[x_s][y_s]
-            if self.move%2==0 and key[-1]!='w': return
-            elif self.move%2==1 and key[-1]!='b': return
-
-            x,y = y_s*75+8, x_s*75+8
-            self.window.highlight(key,x,y)
-            xe,ye = y_e*75+8, x_e*75+8
-
-            if self.window.check_existance(xe,ye) or self.window.check_attack_exist(xe,ye):
-
-                key_e = self.window.figures.figures_board[x_e][y_e]
-                if key_e is None: return
-                if key_e[-1]!=key[-1]:
-
-                    item_e = self.window.scene.itemAt(xe + 30, ye + 30, self.window.transform())
-                    self.window.scene.removeItem(item_e)
-
-                    self.window.change_fig_pos(None, x_s, y_s)
-                    item = self.window.scene.itemAt(x + 30, y + 30, self.window.transform())
-
-                    item.setPos(xe,ye)
-                    self.window.change_fig_pos(key,x_e,y_e)
-                    self.move+=1
-
-            self.window.remove_highlights()
 
     def connect(self):
         if self.status_tcpip == 'server':
@@ -121,7 +68,7 @@ class Game:
                 text = self.window.addons.text_edit.toPlainText()
                 if text == "": return
                 self.window.addons.text_edit.clear()
-                self.input_move(text[:2], text[3:])
+                self.window.input_move(text[:2], text[3:])
 
                 text = text.encode()
                 self.client.sendall(text)
@@ -132,7 +79,7 @@ class Game:
                 text = self.window.addons.text_edit.toPlainText()
                 if text == "": return
                 self.window.addons.text_edit.clear()
-                self.input_move(text[:2], text[3:])
+                self.window.input_move(text[:2], text[3:])
 
                 text = text.encode()
                 self.client_connection.sendall(text)
@@ -151,7 +98,7 @@ class Game:
                         self.game_history.append(data)
                         self.queue.put(f"{data}")
 
-                        self.input_move(data[:2], data[3:])
+                        self.window.input_move(data[:2], data[3:])
                         self.client = connection
 
 
@@ -163,7 +110,7 @@ class Game:
                     self.queue.put(f"{data}")
 
                     print(f"\nreceived: ", data)
-                    self.input_move(data[:2], data[3:])
+                    self.window.input_move(data[:2], data[3:])
 
 
 
@@ -184,7 +131,7 @@ class Game:
                 num = random.randint(0,10)
 
                 if num < 9 and key_e is not None and key_s is not None and key_e[-1]!=key_s[-1]:
-                    self.input_move(random_x, random_y)
+                    self.window.input_move(random_x, random_y)
                 elif num <=2:
-                    self.input_move(random_x, random_y)
+                    self.window.input_move(random_x, random_y)
 

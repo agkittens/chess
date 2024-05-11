@@ -105,7 +105,7 @@ class Window(QGraphicsView):
         text = self.addons.text_edit.toPlainText()
         print("Retrieved text:", text)
         self.addons.text_edit.clear()
-        self.game.input_move(text[:2], text[3:])
+        self.input_move(text[:2], text[3:])
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
@@ -125,6 +125,60 @@ class Window(QGraphicsView):
                 if element == pos:
                     return i, j
         return None, None
+
+    def input_move(self,pos_s, pos_e):
+        x_s,y_s = self.find_pos(pos_s)
+        x_e,y_e = self.find_pos(pos_e)
+
+        if x_s is None and y_s is None: return
+        if x_e is None and y_e is None: return
+
+        if not self.check_if_empty(x_s,y_s) and self.check_if_empty(x_e,y_e):
+            key = self.figures.figures_board[x_s][y_s]
+            if self.game.move%2==0 and key[-1]!='w': return
+            elif self.game.move%2==1 and key[-1]!='b': return
+
+            x,y = y_s*75+8, x_s*75+8
+            self.highlight(key,x,y)
+            xe,ye = y_e*75+8, x_e*75+8
+
+
+            if self.check_existance(xe,ye) or self.check_attack_exist(xe,ye):
+                self.change_fig_pos(None,x_s,y_s)
+                item = self.scene.itemAt(x+30,y+30, self.transform())
+
+                item.setPos(xe,ye)
+                self.change_fig_pos(key,x_e,y_e)
+                self.game.move+=1
+
+            self.remove_highlights()
+
+        elif not self.check_if_empty(x_s,y_s) and not self.check_if_empty(x_e,y_e):
+            key = self.figures.figures_board[x_s][y_s]
+            if self.game.move%2==0 and key[-1]!='w': return
+            elif self.game.move%2==1 and key[-1]!='b': return
+
+            x,y = y_s*75+8, x_s*75+8
+            self.highlight(key,x,y)
+            xe,ye = y_e*75+8, x_e*75+8
+
+            if self.check_existance(xe,ye) or self.check_attack_exist(xe,ye):
+
+                key_e = self.figures.figures_board[x_e][y_e]
+                if key_e is None: return
+                if key_e[-1]!=key[-1]:
+
+                    item_e = self.scene.itemAt(xe + 30, ye + 30, self.transform())
+                    self.scene.removeItem(item_e)
+
+                    self.change_fig_pos(None, x_s, y_s)
+                    item = self.scene.itemAt(x + 30, y + 30, self.transform())
+
+                    item.setPos(xe,ye)
+                    self.change_fig_pos(key,x_e,y_e)
+                    self.game.move+=1
+
+            self.remove_highlights()
 
     def show_figures(self):
         for i in range(len(self.figures.figures_board)):
@@ -235,8 +289,6 @@ class Window(QGraphicsView):
         return pos_x, pos_y, idx_x, idx_y
 
     def drag(self, event):
-        # self.loaded_input()
-
         pos = event.scenePos()
 
         x, y, pos_x, pos_y = self.convert_pos(pos.x(), pos.y())
@@ -330,7 +382,6 @@ class Window(QGraphicsView):
                 new_pos = (x, y)
 
                 if self.dragging_item.data(Qt.UserRole)[0] == "k" and len(self.dragging_item.data(Qt.UserRole)) == 2:
-                    print(2)
                     side = ''
                     if pos_x > 4:
                         side = 'r'
