@@ -44,16 +44,6 @@ class Figure(QGraphicsItem):
 
         return white, black
 
-    def white_movement(self, item_select, item_data, pos, move, arr):
-        if move % 2 == 0 and item_select in arr:
-            item_select.setPos(*pos)
-            return True
-
-    def black_movement(self, item_select, item_data, pos, move, arr):
-        if move % 2 == 1 and item_select in arr:
-            item_select.setPos(*pos)
-
-            return True
 
     def reset_board(self):
         self.figures_board = [['rb', 'knb', 'bb', 'qb', 'kb', 'bb', 'knb', 'rb'],
@@ -67,10 +57,10 @@ class Figure(QGraphicsItem):
                               ]
 
 
-    def change_fig_pos(self, fig, idx_x, idx_y):
+    def change_fig_pos(self, fig: str, idx_x: int, idx_y: int):
         self.figures_board[idx_x][idx_y] = fig
 
-    def do_castling(self, x, side):
+    def do_castling(self, x: int, side: str):
         if x != 7 and x != 0:
             return False
 
@@ -91,7 +81,7 @@ class Figure(QGraphicsItem):
 
 
     @staticmethod
-    def define_pawn_moves(slots, curr_x, curr_y, key):
+    def define_pawn_moves(slots: int, curr_x: int, curr_y: int, key:str):
         val = -1 if key[-1] == 'w' else 1
         moves = []
         attacks = []
@@ -108,7 +98,7 @@ class Figure(QGraphicsItem):
         return moves, attacks
 
     @staticmethod
-    def define_bishop_moves(slots, curr_x, curr_y):
+    def define_bishop_moves(slots: int, curr_x: int, curr_y: int):
         moves = {
             'top_left': [],
             'top_right': [],
@@ -128,7 +118,7 @@ class Figure(QGraphicsItem):
         return moves
 
     @staticmethod
-    def define_rook_moves(slots, curr_x, curr_y):
+    def define_rook_moves(slots: int, curr_x: int, curr_y: int):
         moves = {
             'top': [],
             'right': [],
@@ -147,7 +137,7 @@ class Figure(QGraphicsItem):
         return moves
 
     @staticmethod
-    def define_knight_moves(slots, curr_x, curr_y):
+    def define_knight_moves(slots: int, curr_x: int, curr_y: int):
         moves = []
         offsets = [
             (1, 2), (2, 1), (2, -1), (1, -2),
@@ -160,7 +150,7 @@ class Figure(QGraphicsItem):
         return moves
 
     @staticmethod
-    def deine_king_moves(curr_x, curr_y):
+    def define_king_moves(curr_x: int or None, curr_y: int):
         moves = {
             'top': [],
             'right': [],

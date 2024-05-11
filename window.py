@@ -215,7 +215,7 @@ class Window(QGraphicsView):
         if rect.type() == 3:
             x, y, pos_x, pos_y = self.convert_pos(pos.x(), pos.y())
 
-            if (self.check_existance(x, y) and self.check_if_empty(pos_y, pos_x)) or self.check_attack_exist(x, y):
+            if (self.check_existence(x, y) and self.check_if_empty(pos_y, pos_x)) or self.check_attack_exist(x, y):
                 if self.check_attack_exist(x, y):
                     self.delete_attacked(x, y)
 
@@ -240,7 +240,7 @@ class Window(QGraphicsView):
                 self.game.move += 1
 
 
-            elif not self.check_existance(x, y):
+            elif not self.check_existence(x, y):
                 return
 
             self.addons.update_turn()
@@ -252,7 +252,7 @@ class Window(QGraphicsView):
     
     '''
 
-    def highlight(self, key, x, y):
+    def highlight(self, key: str, x: float, y: float):
 
         x -= 8
         y -= 8
@@ -280,7 +280,7 @@ class Window(QGraphicsView):
             self.execute_king_move(curr_x, curr_y, color, key)
 
 
-    def highlight_rect(self,rect, color):
+    def highlight_rect(self,rect: QRectF, color: str):
         rect.setBrush(color)
         rect.setZValue(0)
         self.scene.addItem(rect)
@@ -297,7 +297,7 @@ class Window(QGraphicsView):
                 self.scene.removeItem(highlight)
             self.highlights_attack = []
 
-    def highlight_current(self, x, y, size_w, size_h):
+    def highlight_current(self, x: float, y: float, size_w: float, size_h: float):
         color = QColor(utilis.FIG_POS_COLOR)
         rect_fig = QGraphicsRectItem(x, y, size_w, size_h)
         rect_fig.setBrush(color)
@@ -320,29 +320,29 @@ class Window(QGraphicsView):
     '''
 
 
-    def define_objects_at(self, x, y, size_x, size_y):
+    def define_objects_at(self, x: float, y: float, size_x: int, size_y: int):
         items = self.scene.items(QRectF(x, y, size_x, size_y))
         return items
 
-    def convert_pos(self, x, y):
+    def convert_pos(self, x: float, y: float):
         pos_x = int(x / self.slot_w) * self.slot_w + 8
         pos_y = int(y / self.slot_h) * self.slot_h + 8
         idx_x = int(x / self.slot_w)
         idx_y = int(y / self.slot_h)
         return pos_x, pos_y, idx_x, idx_y
 
-    def check_if_empty(self, idx_x, idx_y):
+    def check_if_empty(self, idx_x: int, idx_y: int):
         if self.figures.figures_board[idx_x][idx_y] is None:
             return True
         else:
             return False
 
-    def check_existance(self, x, y):
+    def check_existence(self, x: float, y:float):
         for rect in self.highlights:
             if rect.rect().contains(QPointF(x, y)):
                 return True
 
-    def delete_attacked(self, x, y):
+    def delete_attacked(self, x: float, y:float):
 
         figures = self.define_objects_at(x + 30, y + 30, 1, 1)
 
@@ -361,7 +361,7 @@ class Window(QGraphicsView):
                 elif figure.data(Qt.UserRole)[-1] == 'w':
                     self.scene.removeItem(figure)
 
-    def check_attack(self, x, y, key):
+    def check_attack(self, x: float, y: float, key: str):
         fig2 = self.define_objects_at(x + 38, y + 38, 1, 1)
 
         color2 = fig2[0].data(Qt.UserRole)[-1]
@@ -384,7 +384,7 @@ class Window(QGraphicsView):
     input actions
     
     '''
-    def input_move(self,pos_s, pos_e):
+    def input_move(self,pos_s: tuple, pos_e: tuple):
         x_s, y_s = self.find_pos(pos_s)
         x_e, y_e = self.find_pos(pos_e)
 
@@ -405,7 +405,7 @@ class Window(QGraphicsView):
         self.remove_highlights()
 
 
-    def validate_positions(self, x_s, y_s, x_e, y_e):
+    def validate_positions(self, x_s: int, y_s: int, x_e: int, y_e: int):
         if (x_s is None and y_s is None) or (x_e is None and y_e is None):
             return False
         return True
@@ -419,20 +419,20 @@ class Window(QGraphicsView):
         return True
 
 
-    def find_pos(self, pos):
+    def find_pos(self, pos: tuple):
         for i, row in enumerate(self.figures.pos_board):
             for j, element in enumerate(row):
                 if element == pos:
                     return i, j
         return None, None
 
-    def calculate_item_pos(self, x, y):
+    def calculate_item_pos(self, x: int, y: int):
         return y * 75 + 8, x * 75 + 8
 
-    def check_move_validity(self, x_e, y_e):
-        return self.check_existance(x_e, y_e) or self.check_attack_exist(x_e, y_e)
+    def check_move_validity(self, x_e: int, y_e: int):
+        return self.check_existence(x_e, y_e) or self.check_attack_exist(x_e, y_e)
 
-    def perform_move(self, x_s, y_s, x_e, y_e, key):
+    def perform_move(self,x_s: int, y_s: int, x_e: int, y_e: int, key: str):
         self.figures.change_fig_pos(None, y_s, x_s)
         item = self.scene.itemAt(x_s * 75 + 8 + 30, y_s * 75 + 8 + 30, self.transform())
 
@@ -456,7 +456,7 @@ class Window(QGraphicsView):
     
     '''
 
-    def execute_pawn_move(self,curr_x,curr_y,color,key):
+    def execute_pawn_move(self, curr_x: int,curr_y: int,color: str,key: str):
         moves, attacks = self.figures.define_pawn_moves(self.slots, curr_x, curr_y, key)
 
         for move_x, move_y in moves:
@@ -468,7 +468,7 @@ class Window(QGraphicsView):
             if not self.check_if_empty(attack_y, attack_x):
                 self.check_attack(attack_x * self.slot_w, attack_y * self.slot_h, key)
 
-    def execute_rook_move(self,curr_x,curr_y,color,key):
+    def execute_rook_move(self,curr_x: int,curr_y: int,color: str,key: str):
         moves = self.figures.define_rook_moves(self.slots, curr_x, curr_y)
         for side, side_moves in moves.items():
             for move_x, move_y in side_moves:
@@ -481,7 +481,7 @@ class Window(QGraphicsView):
                     self.check_attack(move_x * self.slot_w, move_y * self.slot_h, key)
                     break
 
-    def execute_bishop_move(self,curr_x,curr_y,color,key):
+    def execute_bishop_move(self,curr_x: int,curr_y: int,color: str,key: str):
         moves = self.figures.define_bishop_moves(self.slots, curr_x, curr_y)
         for side, side_moves in moves.items():
             for move_x, move_y in side_moves:
@@ -494,7 +494,7 @@ class Window(QGraphicsView):
                     self.check_attack(move_x * self.slot_w, move_y * self.slot_h, key)
                     break
 
-    def execute_knight_move(self,curr_x,curr_y,color,key):
+    def execute_knight_move(self,curr_x: int,curr_y: int,color: str,key: str):
         moves = self.figures.define_knight_moves(self.slots, curr_x, curr_y)
 
         for move_x, move_y in moves:
@@ -504,8 +504,8 @@ class Window(QGraphicsView):
             rect = QGraphicsRectItem(move_x * self.slot_w, move_y * self.slot_h, self.slot_w, self.slot_h)
             self.highlight_rect(rect, color)
 
-    def execute_king_move(self,curr_x,curr_y,color,key):
-        moves = self.figures.deine_king_moves(curr_x, curr_y)
+    def execute_king_move(self,curr_x: int,curr_y: int,color: str,key: str):
+        moves = self.figures.define_king_moves(curr_x, curr_y)
         for side, side_moves in moves.items():
             for move_x, move_y in side_moves:
                 if self.check_if_empty(move_y, move_x):
@@ -532,7 +532,7 @@ class Window(QGraphicsView):
                 pass
 
 
-    def move_for_castling(self,pos_x,x,y):
+    def move_for_castling(self,pos_x: int,x: float,y: float):
         if self.dragging_item.data(Qt.UserRole)[0] == "k" and len(self.dragging_item.data(Qt.UserRole)) == 2:
             side = ''
             if pos_x > 4: side = 'r'
@@ -540,7 +540,7 @@ class Window(QGraphicsView):
             if side == '': return
 
             if self.figures.do_castling(self.last_pos[1], side):
-                mov,mov_r,r_pos = 0,0,0
+                mov, mov_r, r_pos = 0, 0, 0
                 if side == 'l':
                     mov = 2
                     mov_r = 3
