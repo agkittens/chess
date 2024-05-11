@@ -69,3 +69,88 @@ class Figure(QGraphicsItem):
                               ['pw', 'pw', 'pw', 'pw', 'pw', 'pw', 'pw', 'pw'],
                               ['rw', 'knw', 'bw', 'qw', 'kw', 'bw', 'knw', 'rw']
                               ]
+
+
+    def define_pawn_moves(self, slots, curr_x, curr_y, key):
+        val = -1 if key[-1] == 'w' else 1
+        moves = []
+        attacks = []
+
+        if 0 <= curr_y + val < 8:
+            moves.append((curr_x, curr_y + val))
+
+            if ((curr_y == 1 and key[-1] == 'b') or (curr_y == 6 and key[-1] == 'w')) and 0 <= curr_y + 2 * val < 8:
+                moves.append((curr_x, curr_y + 2 * val))
+
+            for dx in [-1, 1]:
+                if 0 <= curr_x + dx < 8 and 0 <= curr_y + val < 8:
+                    attacks.append((curr_x + dx, curr_y + val))
+        return moves,attacks
+
+    def define_bishop_moves(self, slots, curr_x, curr_y):
+        moves = {
+            'top_left': [],
+            'top_right': [],
+            'bottom_left': [],
+            'bottom_right': []
+        }
+
+        offsets = [(1, -1), (1, 1), (-1, -1), (-1, 1)]
+
+        for i, (offset_x, offset_y) in enumerate(offsets):
+            for distance in range(1, slots):
+                new_x, new_y = curr_x + offset_x * distance, curr_y + offset_y * distance
+                if 0 <= new_x < slots and 0 <= new_y < slots:
+                    moves[list(moves.keys())[i]].append((new_x, new_y))
+                else:
+                    break
+        return moves
+
+    def define_rook_moves(self,slots, curr_x, curr_y):
+        moves = {
+            'top': [],
+            'right': [],
+            'left': [],
+            'bottom': []
+        }
+        offsets = [(0, 1), (1, 0), (-1, 0), (0, -1)]
+
+        for i, (offset_x, offset_y) in enumerate(offsets):
+            for distance in range(1, slots):
+                new_x, new_y = curr_x + offset_x * distance, curr_y + offset_y * distance
+                if 0 <= new_x < slots and 0 <= new_y < slots:
+                    moves[list(moves.keys())[i]].append((new_x, new_y))
+                else:
+                    break
+        return moves
+
+    def define_knight_moves(self,slots, curr_x, curr_y):
+        moves = []
+        offsets = [
+            (1, 2), (2, 1), (2, -1), (1, -2),
+            (-1, -2), (-2, -1), (-2, 1), (-1, 2)
+        ]
+        for offset_x, offset_y in offsets:
+            new_x, new_y = curr_x + offset_x, curr_y + offset_y
+            if 0 <= new_x < slots and 0 <= new_y < slots:
+                moves.append((new_x, new_y))
+        return moves
+
+    def deine_king_moves(self, curr_x, curr_y):
+        moves = {
+            'top': [],
+            'right': [],
+            'left': [],
+            'bottom': [],
+            'top_left': [],
+            'top_right': [],
+            'bottom_left': [],
+            'bottom_right': []
+        }
+        offsets = [(0, 1), (1, 0), (-1, 0), (0, -1), (1, -1), (1, 1), (-1, -1), (-1, 1)]
+
+        for i, (offset_x, offset_y) in enumerate(offsets):
+            new_x, new_y = curr_x + offset_x, curr_y + offset_y
+            if 0 <= new_x < 8 and 0 <= new_y < 8:
+                moves[list(moves.keys())[i]].append((new_x, new_y))
+        return moves

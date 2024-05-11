@@ -20,7 +20,6 @@ class Game:
         self.mode = 0
         self.max_time = 15
 
-
         self.opponent = 'player'
         self.ip = 'localhost'
         self.port = 8888
@@ -28,19 +27,6 @@ class Game:
         self.move = 0
         self.save = [""]
         self.game_history = [""]
-
-    # def exec_move(self):
-    #     if self.move_index < len(self.stream_data):
-    #         moves = self.stream_data[self.move_index]
-    #         for move in moves:
-    #             if move != '':
-    #                 self.input_move(move[:2], move[3:])
-    #
-    #         self.move_index += 1
-    #         QTimer.singleShot(2000,self.exec_move)
-    #
-    #     else:
-    #         self.addons.is_loaded = False
 
 
     def input_move(self,pos_s, pos_e):
@@ -96,7 +82,7 @@ class Game:
                     self.move+=1
 
             self.window.remove_highlights()
-            
+
     def connect(self):
         if self.status_tcpip == 'server':
             self.server_connection = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -49,11 +49,6 @@ class Window(QGraphicsView):
         self.timer.start(1000)
         self.start_time = time.time()
 
-        #
-        # self.check = QTimer()
-        # self.check.timeout.connect(self.loaded_input)
-        # self.check.start(1000)
-
         self.serv_client = QTimer()
         self.serv_client.timeout.connect(self.game.manage_communication)
         self.serv_client.start(1000)
@@ -122,18 +117,7 @@ class Window(QGraphicsView):
         else:
             super().keyPressEvent(event)
 
-    # def loaded_input(self):
-    #     if self.addons.is_loaded:
-    #         self.move_index = 0
-    #         QTimer.singleShot(0, self.game.exec_move)
 
-    # for moves in self.stream_data:
-    #     for move in moves:
-    #         if move != '':
-    #             self.input_move(move[:2],move[3:])
-    #
-    #     QTimer.singleShot(3000, self.loaded_input())
-    # self.addons.is_loaded = False
 
     def find_pos(self, pos):
         for i, row in enumerate(self.figures.pos_board):
@@ -387,9 +371,6 @@ class Window(QGraphicsView):
                 figure = self.dragging_item.data(Qt.UserRole)
                 self.change_fig_pos(figure, pos_y, pos_x)
 
-                # if not self.end_game() or self.game.white_time >= max or self.game.black_time >= max:
-                #     time.sleep(5.0)
-                #     self.close()
                 self.highlight(self.dragging_item.data(Qt.UserRole), x, y)
                 self.check_mate()
                 self.remove_highlights()
@@ -405,7 +386,6 @@ class Window(QGraphicsView):
 
     def highlight(self, key, x, y):
 
-        val = 1
         x -= 8
         y -= 8
 
@@ -417,165 +397,84 @@ class Window(QGraphicsView):
         self.highlight_current(x, y, self.slot_w, self.slot_h)
 
         if (key == 'pw' or key == 'pb'):
-            self.pawn_move(x, y, key, curr_x, curr_y, val, color)
+            self.execute_pawn_move(curr_x, curr_y, color, key)
 
         if key == 'rw' or key == 'rb' or key == "qw" or key == "qb":
-            self.rook_move(x, y, key, curr_x, curr_y, val, color)
+            self.execute_rook_move(curr_x, curr_y, color, key)
 
         if key == 'bw' or key == 'bb' or key == "qw" or key == "qb":
-            self.bishop_move(x, y, key, curr_x, curr_y, val, color)
+            self.execute_bishop_move(curr_x, curr_y, color, key)
 
         if key == 'knw' or key == 'knb':
-            self.knight_move(x, y, key, curr_x, curr_y, val, color)
+            self.execute_knight_move(curr_x, curr_y, color, key)
 
         if key == "kw" or key == "kb":
-            self.king_move(x, y, curr_x, curr_y, val, color)
+            self.execute_king_move(curr_x, curr_y, color, key)
 
-    def pawn_move(self, x, y, key, curr_x, curr_y, val, color):
-        if key[-1] == 'w': val = -1
+    def execute_pawn_move(self,curr_x,curr_y,color,key):
+        moves, attacks = self.figures.define_pawn_moves(self.slots, curr_x, curr_y, key)
 
-        if (curr_x + 1) in range(0, 8) and (curr_x - 1) in range(0, 8):
+        for move_x, move_y in moves:
+            if self.check_if_empty(move_y, move_x):
+                rect = QGraphicsRectItem(move_x * self.slot_w, move_y * self.slot_h, self.slot_w, self.slot_h)
+                self.highlight_rect(rect, color)
 
-            if not self.check_if_empty(curr_y + val, curr_x + 1):
-                self.check_attack(x + self.slot_w, y + val * self.slot_w, key)
+        for attack_x, attack_y in attacks:
+            if not self.check_if_empty(attack_y, attack_x):
+                self.check_attack(attack_x * self.slot_w, attack_y * self.slot_h, key)
 
-            if not self.check_if_empty(curr_y + val, curr_x - 1):
-                self.check_attack(x - self.slot_w, y + +val * self.slot_w, key)
+    def execute_rook_move(self,curr_x,curr_y,color,key):
+        moves = self.figures.define_rook_moves(self.slots, curr_x, curr_y)
+        for side, side_moves in moves.items():
+            for move_x, move_y in side_moves:
+                if self.check_if_empty(move_y, move_x):
+                    rect = QGraphicsRectItem(self.slot_w * move_x, self.slot_h * move_y, self.slot_w,
+                                             self.slot_h)
+                    self.highlight_rect(rect, color)
+                else:
 
-        if self.check_if_empty(curr_y + val, curr_x):
-            rect1 = QGraphicsRectItem(x, y + val * self.slot_h, self.slot_w, self.slot_h)
-            rect1.setBrush(color)
-            rect1.setZValue(0)
-            self.scene.addItem(rect1)
-            self.highlights.append(rect1)
-
-            if (y == val * self.slot_h or y == self.height + 2 * val * self.slot_h) and self.check_if_empty(
-                    curr_y + 2 * val, curr_x):
-                rect2 = QGraphicsRectItem(x, y + 2 * val * self.slot_h, self.slot_w, self.slot_h)
-                rect2.setBrush(color)
-                rect2.setZValue(0)
-                self.scene.addItem(rect2)
-                self.highlights.append(rect2)
-
-    def rook_move(self, x, y, key, curr_x, curr_y, val, color):
-        for slot in range(curr_y + 1, self.slots):
-            if not self.check_if_empty(slot, curr_x):
-                self.check_attack(x, self.slot_h * slot, key)
-                break
-
-            rect1 = QGraphicsRectItem(x, val * self.slot_h * slot, self.slot_w, self.slot_h)
-            rect1.setBrush(color)
-            rect1.setZValue(0)
-
-            if y != val * self.slot_h * slot:
-                self.scene.addItem(rect1)
-                self.highlights.append(rect1)
-
-        for slot in range(curr_y - 1, -1, -1):
-            if not self.check_if_empty(slot, curr_x):
-                self.check_attack(x, self.slot_h * slot, key)
-                break
-            rect1 = QGraphicsRectItem(x, val * self.slot_h * slot, self.slot_w, self.slot_h)
-            rect1.setBrush(color)
-            rect1.setZValue(0)
-
-            if y != val * self.slot_h * slot:
-                self.scene.addItem(rect1)
-                self.highlights.append(rect1)
-
-        for slot in range(curr_x - 1, -1, -1):
-            if not self.check_if_empty(curr_y, slot):
-                self.check_attack(self.slot_w * slot, y, key)
-                break
-
-            rect2 = QGraphicsRectItem(slot * val * self.slot_w, y, self.slot_w, self.slot_h)
-            rect2.setBrush(color)
-            rect2.setZValue(0)
-
-            if x != slot * val * self.slot_w:
-                self.scene.addItem(rect2)
-                self.highlights.append(rect2)
-
-        for slot in range(curr_x + 1, self.slots):
-            if not self.check_if_empty(curr_y, slot):
-                self.check_attack(self.slot_w * slot, y, key)
-                break
-            rect2 = QGraphicsRectItem(slot * val * self.slot_w, y, self.slot_w, self.slot_h)
-            rect2.setBrush(color)
-            rect2.setZValue(0)
-
-            if x != slot * val * self.slot_w:
-                self.scene.addItem(rect2)
-                self.highlights.append(rect2)
-
-    def bishop_move(self, x, y, key, curr_x, curr_y, val, color):
-        for _ in range(4):
-            val_x = val * (-1) ** _
-            val_y = val * (-1) ** (_ // 2)
-
-            for slot in range(1, self.slots):
-
-                if curr_y + val_y * slot in range(self.slots) and curr_x + val_x * slot in range(self.slots):
-                    if not self.check_if_empty(curr_y + val_y * slot, curr_x + val_x * slot):
-                        self.check_attack(x + self.slot_w * slot * val_x, y + self.slot_h * slot * val_y, key)
-                        break
-
-                    rect1 = QGraphicsRectItem(x + val_x * self.slot_w * slot, y + val_y * self.slot_h * slot,
-                                              self.slot_w, self.slot_h)
-                    rect1.setBrush(color)
-                    rect1.setZValue(0)
-
-                    if y != y + val_y * self.slot_h * slot and x != x + val_x * self.slot_w * slot:
-                        self.scene.addItem(rect1)
-                        self.highlights.append(rect1)
-
-    def knight_move(self, x, y, key, curr_x, curr_y, val, color):
-        for _ in range(4):
-            val_x = val * (-1) ** _
-            val_y = val * (-1) ** (_ // 2)
-
-            if curr_y + 2 * val_y in range(self.slots) and curr_x + val_x in range(self.slots):
-                if not self.check_if_empty(curr_y + 2 * val_y, curr_x + val_x):
-                    self.check_attack(x + val_x * self.slot_w, y + 2 * val_y * self.slot_h, key)
+                    self.check_attack(move_x * self.slot_w, move_y * self.slot_h, key)
                     break
 
-                rect1 = QGraphicsRectItem(x + val_x * self.slot_w, y + 2 * val_y * self.slot_h, self.slot_w,
-                                          self.slot_h)
-                rect1.setBrush(color)
-                rect1.setZValue(0)
-                self.scene.addItem(rect1)
-                self.highlights.append(rect1)
+    def execute_bishop_move(self,curr_x,curr_y,color,key):
+        moves = self.figures.define_bishop_moves(self.slots, curr_x, curr_y)
+        for side, side_moves in moves.items():
+            for move_x, move_y in side_moves:
+                if self.check_if_empty(move_y, move_x):
+                    rect = QGraphicsRectItem(self.slot_w * move_x, self.slot_h * move_y, self.slot_w,
+                                             self.slot_h)
+                    self.highlight_rect(rect, color)
+                else:
 
-            if curr_y + val_y in range(self.slots) and curr_x + 2 * val_x in range(self.slots):
-
-                if not self.check_if_empty(curr_y + val_y, curr_x + 2 * val_x):
-                    self.check_attack(x + 2 * val_x * self.slot_w, y + val_y * self.slot_h, key)
+                    self.check_attack(move_x * self.slot_w, move_y * self.slot_h, key)
                     break
 
-                rect2 = QGraphicsRectItem(x + 2 * val_x * self.slot_w, y + val_y * self.slot_h, self.slot_w,
-                                          self.slot_h)
-                rect2.setBrush(color)
-                rect2.setZValue(0)
-                self.scene.addItem(rect2)
-                self.highlights.append(rect2)
+    def execute_knight_move(self,curr_x,curr_y,color,key):
+        moves = self.figures.define_knight_moves(self.slots, curr_x, curr_y)
 
-    def king_move(self, x, y, curr_x, curr_y, val, color):
-        for _ in range(8):
-            val_x = val * (-1) ** _
-            val_y = val * (-1) ** (_ // 2)
-            if _ == 0 or _ == 3:
-                val_x = 0
-            if _ == 1 or _ == 2:
-                val_y = 0
+        for move_x, move_y in moves:
+            if not self.check_if_empty(move_y, move_x):
+                self.check_attack(move_x * self.slot_w, move_y * self.slot_h, key)
+                continue
+            rect = QGraphicsRectItem(move_x * self.slot_w, move_y * self.slot_h, self.slot_w, self.slot_h)
+            self.highlight_rect(rect, color)
 
-            if curr_x + val_x in range(8) and curr_y + val_y in range(8):
-                if self.check_if_empty(curr_y + val_y, curr_x + val_x):
-                    rect1 = QGraphicsRectItem(x + val_x * self.slot_w, y + val_y * self.slot_h, self.slot_w,
-                                              self.slot_h)
-                    rect1.setBrush(color)
-                    rect1.setZValue(0)
-                    self.scene.addItem(rect1)
-                    self.highlights.append(rect1)
+    def execute_king_move(self,curr_x,curr_y,color,key):
+        moves = self.figures.deine_king_moves(curr_x, curr_y)
+        for side, side_moves in moves.items():
+            for move_x, move_y in side_moves:
+                if self.check_if_empty(move_y, move_x):
+                    rect = QGraphicsRectItem(move_x * self.slot_w, move_y * self.slot_h, self.slot_w, self.slot_h)
+                    self.highlight_rect(rect, color)
+                else:
+                    self.check_attack(move_x * self.slot_w, move_y * self.slot_h, key)
+                    break
+
+    def highlight_rect(self,rect, color):
+        rect.setBrush(color)
+        rect.setZValue(0)
+        self.scene.addItem(rect)
+        self.highlights.append(rect)
 
     def remove_highlights(self):
         if len(self.highlights) > 0:
