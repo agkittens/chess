@@ -1,9 +1,8 @@
 import time
-
 import utilis
 from figures import Figure
 from game import Game
-
+from addons import Addons
 from PyQt5.QtWidgets import QGraphicsScene, QGraphicsView, QGraphicsRectItem
 from PyQt5.QtGui import QColor
 from PyQt5.QtCore import Qt, QPointF, QRectF, QTimer
@@ -27,7 +26,6 @@ class Window(QGraphicsView):
         self.last_pos = []
         self.slot_w = self.width / self.slots
         self.slot_h = self.height / self.slots
-
         self.board = [[0, 1, 0, 1, 0, 1, 0, 1],
                       [1, 0, 1, 0, 1, 0, 1, 0],
                       [0, 1, 0, 1, 0, 1, 0, 1],
@@ -36,30 +34,14 @@ class Window(QGraphicsView):
                       [1, 0, 1, 0, 1, 0, 1, 0],
                       [0, 1, 0, 1, 0, 1, 0, 1],
                       [1, 0, 1, 0, 1, 0, 1, 0]]
+
         self.dragging_item = None
 
-        from addons import Addons
         self.game = Game(self)
-
         self.addons = Addons(self)
         self.input = ''
 
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.addons.update_time)
-        self.timer.start(1000)
-        self.start_time = time.time()
-
-        self.serv_client = QTimer()
-        self.serv_client.timeout.connect(self.game.manage_communication)
-        self.serv_client.start(1000)
-
-        self.turn_timer = QTimer()
-        self.turn_timer.timeout.connect(self.addons.update_turn)
-        self.turn_timer.start(1000)
-
-        self.ai_timer = QTimer()
-        self.ai_timer.timeout.connect(self.game.ai_move)
-        self.ai_timer.start(1000)
+        self.timer, self.turn_timer, self.ai_timer, self.serv_client = self.create_timers()
 
         self.create_window()
 
@@ -69,6 +51,7 @@ class Window(QGraphicsView):
         - creating window
         - board
         - placing figures
+        - timers
     
     '''
 
@@ -131,6 +114,31 @@ class Window(QGraphicsView):
                     item.setZValue(1)
                     self.white.append(item)
 
+    def create_timers(self):
+        timer = QTimer()
+        timer.timeout.connect(self.addons.update_time)
+        timer.start(1000)
+
+        turn_timer = QTimer()
+        turn_timer.timeout.connect(self.addons.update_turn)
+        turn_timer.start(1000)
+
+        ai_timer = None
+        serv_client = None
+
+        if self.game.opponent == 'ai':
+            ai_timer = QTimer()
+            ai_timer.timeout.connect(self.game.ai_move)
+            ai_timer.start(2000)
+
+        elif self.game.opponent == 'player':
+            serv_client = QTimer()
+            serv_client.timeout.connect(self.game.manage_communication)
+            serv_client.start(1000)
+
+        return timer, turn_timer, ai_timer, serv_client
+
+
     '''
     
     interface events: 
@@ -160,50 +168,31 @@ class Window(QGraphicsView):
     def drag(self, event):
         pos = event.scenePos()
 
-        x, y, pos_x, pos_y = self.convert_pos(pos.x(), pos.y())
-
-        self.start_time = time.time()
+        self.game.start_time = time.time()
 
         item_clicked = self.scene.itemAt(pos, self.transform())
         self.addons.update_label()
 
-        if item_clicked.type() == 3:
+        try:
+            item_data = item_clicked.data(Qt.UserRole)
+            if (self.game.move % 2 == 0 and item_data[-1] == 'w')\
+                    or (self.game.move % 2 == 1 and item_data[-1] == 'b'):
+
+                x, y, pos_x, pos_y = self.convert_pos(pos.x(), pos.y())
+
+                self.highlight(item_data, x, y)
+                self.dragging_item = item_clicked
+                self.figures.change_fig_pos(None, pos_y, pos_x)
+
+                self.last_pos = [int(self.dragging_item.x() / self.slot_w),
+                                 int(self.dragging_item.y() / self.slot_h)]
+
+                chess_pos = self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]
+                self.game.queue.put(f"last pos {chess_pos}\n")
+                self.game.game_history.append(f"{item_data}: {chess_pos} ")
+
+        except TypeError:
             pass
-
-        if item_clicked.type() == 12:
-            pass
-
-        else:
-            try:
-                item_data = item_clicked.data(Qt.UserRole)
-                if self.game.move % 2 == 0 and item_data[-1] == 'w':
-
-                    self.highlight(item_data, x, y)
-                    self.dragging_item = item_clicked
-                    self.figures.change_fig_pos(None, pos_y, pos_x)
-
-                    self.last_pos = [int(self.dragging_item.x() / self.slot_w),
-                                     int(self.dragging_item.y() / self.slot_h)]
-
-                    chess_pos = self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]
-                    self.game.queue.put(f"last pos {chess_pos}\n")
-                    self.game.game_history.append(f"{item_data}: {chess_pos} ")
-
-                elif self.game.move % 2 == 1 and item_data[-1] == 'b':
-
-                    self.highlight(item_data, x, y)
-                    self.dragging_item = item_clicked
-                    self.figures.change_fig_pos(None, pos_y, pos_x)
-
-                    self.last_pos = [int(self.dragging_item.x() / self.slot_w),
-                                     int(self.dragging_item.y() / self.slot_h)]
-
-                    chess_pos = self.figures.pos_board[self.last_pos[1]][self.last_pos[0]]
-                    self.game.queue.put(f"last pos {chess_pos}\n")
-                    self.game.game_history.append(f"{item_data}: {chess_pos} ")
-
-            except TypeError:
-                pass
 
     def move_img(self, event):
         if self.dragging_item:
@@ -232,38 +221,8 @@ class Window(QGraphicsView):
 
                 new_pos = (x, y)
 
-                if self.dragging_item.data(Qt.UserRole)[0] == "k" and len(self.dragging_item.data(Qt.UserRole)) == 2:
-                    side = ''
-                    if pos_x > 4:
-                        side = 'r'
-
-                    elif pos_x < 4:
-                        side = 'l'
-
-                    if side != '':
-                        if self.figures.do_castling(self.last_pos[1], side):
-                            mov = 0
-                            mov_r = 0
-                            r_pos = 0
-
-                            if side == 'l':
-                                mov = 2
-                                mov_r = 3
-
-                            elif side == 'r':
-                                mov = 6
-                                mov_r = 5
-                                r_pos = 7
-
-                            new_pos = (mov * self.slot_h + 8, y)
-                            new_pos_r = (mov_r * self.slot_h + 8, y)
-                            items = self.define_objects_at(r_pos * self.slot_h + 8 + 38, y + 38, 1, 1)
-
-                            if items[0].data(Qt.UserRole)[-1] != self.dragging_item.data(Qt.UserRole)[-1]:
-                                new_pos = (x, y)
-                            else:
-                                items[0].setPos(*new_pos_r)
-
+                status, temp_pos = self.move_for_castling(pos_x,x,y)
+                if status: new_pos=temp_pos
                 chess_pos = self.figures.pos_board[pos_y][pos_x]
 
                 self.game.queue.put(f" new pos {chess_pos}\n")
@@ -420,62 +379,44 @@ class Window(QGraphicsView):
             if rect.rect().contains(QPointF(x, y)):
                 return True
 
+    '''
+    
+    input actions
+    
+    '''
     def input_move(self,pos_s, pos_e):
-        x_s,y_s = self.find_pos(pos_s)
-        x_e,y_e = self.find_pos(pos_e)
+        x_s, y_s = self.find_pos(pos_s)
+        x_e, y_e = self.find_pos(pos_e)
 
-        if x_s is None and y_s is None: return
-        if x_e is None and y_e is None: return
+        if not self.validate_positions(x_s, y_s, x_e, y_e):
+            return
 
-        if not self.check_if_empty(x_s,y_s) and self.check_if_empty(x_e,y_e):
-            key = self.figures.figures_board[x_s][y_s]
-            if self.game.move%2==0 and key[-1]!='w': return
-            elif self.game.move%2==1 and key[-1]!='b': return
+        key = self.figures.figures_board[x_s][y_s]
+        if not self.validate_turn(key, self.game.move):
+            return
 
-            x,y = y_s*75+8, x_s*75+8
-            self.highlight(key,x,y)
-            xe,ye = y_e*75+8, x_e*75+8
+        x, y = self.calculate_item_pos(x_s, y_s)
+        self.highlight(key, x, y)
+        xe, ye = self.calculate_item_pos(x_e, y_e)
 
-
-            if self.check_existance(xe,ye) or self.check_attack_exist(xe,ye):
-                self.figures.change_fig_pos(None,x_s,y_s)
-                item = self.scene.itemAt(x+30,y+30, self.transform())
-
-                item.setPos(xe,ye)
-                self.figures.change_fig_pos(key,x_e,y_e)
-                self.game.move+=1
-
-            self.remove_highlights()
-
-        elif not self.check_if_empty(x_s,y_s) and not self.check_if_empty(x_e,y_e):
-            key = self.figures.figures_board[x_s][y_s]
-            if self.game.move%2==0 and key[-1]!='w': return
-            elif self.game.move%2==1 and key[-1]!='b': return
-
-            x,y = y_s*75+8, x_s*75+8
-            self.highlight(key,x,y)
-            xe,ye = y_e*75+8, x_e*75+8
-
-            if self.check_existance(xe,ye) or self.check_attack_exist(xe,ye):
-
-                key_e = self.figures.figures_board[x_e][y_e]
-                if key_e is None: return
-                if key_e[-1]!=key[-1]:
-
-                    item_e = self.scene.itemAt(xe + 30, ye + 30, self.transform())
-                    self.scene.removeItem(item_e)
-
-                    self.figures.change_fig_pos(None, x_s, y_s)
-                    item = self.scene.itemAt(x + 30, y + 30, self.transform())
-
-                    item.setPos(xe,ye)
-                    self.figures.change_fig_pos(key,x_e,y_e)
-                    self.game.move+=1
-
-            self.remove_highlights()
+        if self.check_move_validity(xe, ye):
+            self.perform_move(y_s, x_s, y_e, x_e, key)
+            self.game.move += 1
+        self.remove_highlights()
 
 
+    def validate_positions(self, x_s, y_s, x_e, y_e):
+        if (x_s is None and y_s is None) or (x_e is None and y_e is None):
+            return False
+        return True
 
+    def validate_turn(self, key, move):
+        if key is None: return
+        if move % 2 == 0 and key[-1] != 'w':
+            return False
+        elif move % 2 == 1 and key[-1] != 'b':
+            return False
+        return True
 
 
     def find_pos(self, pos):
@@ -484,6 +425,27 @@ class Window(QGraphicsView):
                 if element == pos:
                     return i, j
         return None, None
+
+    def calculate_item_pos(self, x, y):
+        return y * 75 + 8, x * 75 + 8
+
+    def check_move_validity(self, x_e, y_e):
+        return self.check_existance(x_e, y_e) or self.check_attack_exist(x_e, y_e)
+
+    def perform_move(self, x_s, y_s, x_e, y_e, key):
+        self.figures.change_fig_pos(None, y_s, x_s)
+        item = self.scene.itemAt(x_s * 75 + 8 + 30, y_s * 75 + 8 + 30, self.transform())
+
+
+        if not self.check_if_empty(y_e, x_e):
+            key_e = self.figures.figures_board[y_e][x_e]
+            if key[-1]!=key_e[-1]:
+                item_e = self.scene.itemAt(x_e * 75 + 8 + 30, y_e * 75 + 8 + 30, self.transform())
+                self.scene.removeItem(item_e)
+
+        item.setPos(x_e * 75 + 8, y_e * 75 + 8)
+        self.figures.change_fig_pos(key, y_e, x_e)
+
 
 
 
@@ -569,3 +531,32 @@ class Window(QGraphicsView):
             if highlight.rect().contains(QPointF(*slot)):
                 pass
 
+
+    def move_for_castling(self,pos_x,x,y):
+        if self.dragging_item.data(Qt.UserRole)[0] == "k" and len(self.dragging_item.data(Qt.UserRole)) == 2:
+            side = ''
+            if pos_x > 4: side = 'r'
+            elif pos_x < 4: side = 'l'
+            if side == '': return
+
+            if self.figures.do_castling(self.last_pos[1], side):
+                mov,mov_r,r_pos = 0,0,0
+                if side == 'l':
+                    mov = 2
+                    mov_r = 3
+
+                elif side == 'r':
+                    mov = 6
+                    mov_r = 5
+                    r_pos = 7
+
+                new_pos = (mov * self.slot_h + 8, y)
+                new_pos_rook = (mov_r * self.slot_h + 8, y)
+                items = self.define_objects_at(r_pos * self.slot_h + 8 + 38, y + 38, 1, 1)
+
+                if items[0].data(Qt.UserRole)[-1] == self.dragging_item.data(Qt.UserRole)[-1]:
+                    self.dragging_item.setPos(*new_pos)
+                    items[0].setPos(*new_pos_rook)
+                    return True, new_pos
+
+        return False, (None, None)
