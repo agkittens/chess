@@ -66,6 +66,30 @@ class Figure(QGraphicsItem):
                               ['rw', 'knw', 'bw', 'qw', 'kw', 'bw', 'knw', 'rw']
                               ]
 
+
+    def change_fig_pos(self, fig, idx_x, idx_y):
+        self.figures_board[idx_x][idx_y] = fig
+
+    def do_castling(self, x, side):
+        if x != 7 and x != 0:
+            return False
+
+        num1 = 1
+        num2 = 4
+
+        if side == 'r':
+            num1 = 5
+            num2 = 7
+
+        for i in range(num1, num2):
+            if self.figures_board[x][i] is not None: return False
+
+        if self.figures_board[x][0][0] != 'r' or self.figures_board[x][7][0] != 'r':
+            return False
+
+        return True
+
+
     @staticmethod
     def define_pawn_moves(slots, curr_x, curr_y, key):
         val = -1 if key[-1] == 'w' else 1

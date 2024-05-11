@@ -63,6 +63,15 @@ class Window(QGraphicsView):
 
         self.create_window()
 
+    '''
+    
+    interface setup:
+        - creating window
+        - board
+        - placing figures
+    
+    '''
+
     def create_window(self):
 
         self.setWindowTitle(self.title)
@@ -101,84 +110,6 @@ class Window(QGraphicsView):
 
                 self.scene.addItem(rect_item)
 
-    def retrieve_text(self):
-        text = self.addons.text_edit.toPlainText()
-        print("Retrieved text:", text)
-        self.addons.text_edit.clear()
-        self.input_move(text[:2], text[3:])
-
-    def keyPressEvent(self, event):
-        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
-            if self.game.opponent == 'player':
-                self.game.send_data()
-
-            elif self.game.opponent == 'ai':
-                self.retrieve_text()
-        else:
-            super().keyPressEvent(event)
-
-
-
-    def find_pos(self, pos):
-        for i, row in enumerate(self.figures.pos_board):
-            for j, element in enumerate(row):
-                if element == pos:
-                    return i, j
-        return None, None
-
-    def input_move(self,pos_s, pos_e):
-        x_s,y_s = self.find_pos(pos_s)
-        x_e,y_e = self.find_pos(pos_e)
-
-        if x_s is None and y_s is None: return
-        if x_e is None and y_e is None: return
-
-        if not self.check_if_empty(x_s,y_s) and self.check_if_empty(x_e,y_e):
-            key = self.figures.figures_board[x_s][y_s]
-            if self.game.move%2==0 and key[-1]!='w': return
-            elif self.game.move%2==1 and key[-1]!='b': return
-
-            x,y = y_s*75+8, x_s*75+8
-            self.highlight(key,x,y)
-            xe,ye = y_e*75+8, x_e*75+8
-
-
-            if self.check_existance(xe,ye) or self.check_attack_exist(xe,ye):
-                self.change_fig_pos(None,x_s,y_s)
-                item = self.scene.itemAt(x+30,y+30, self.transform())
-
-                item.setPos(xe,ye)
-                self.change_fig_pos(key,x_e,y_e)
-                self.game.move+=1
-
-            self.remove_highlights()
-
-        elif not self.check_if_empty(x_s,y_s) and not self.check_if_empty(x_e,y_e):
-            key = self.figures.figures_board[x_s][y_s]
-            if self.game.move%2==0 and key[-1]!='w': return
-            elif self.game.move%2==1 and key[-1]!='b': return
-
-            x,y = y_s*75+8, x_s*75+8
-            self.highlight(key,x,y)
-            xe,ye = y_e*75+8, x_e*75+8
-
-            if self.check_existance(xe,ye) or self.check_attack_exist(xe,ye):
-
-                key_e = self.figures.figures_board[x_e][y_e]
-                if key_e is None: return
-                if key_e[-1]!=key[-1]:
-
-                    item_e = self.scene.itemAt(xe + 30, ye + 30, self.transform())
-                    self.scene.removeItem(item_e)
-
-                    self.change_fig_pos(None, x_s, y_s)
-                    item = self.scene.itemAt(x + 30, y + 30, self.transform())
-
-                    item.setPos(xe,ye)
-                    self.change_fig_pos(key,x_e,y_e)
-                    self.game.move+=1
-
-            self.remove_highlights()
 
     def show_figures(self):
         for i in range(len(self.figures.figures_board)):
@@ -200,93 +131,31 @@ class Window(QGraphicsView):
                     item.setZValue(1)
                     self.white.append(item)
 
-    def define_objects_at(self, x, y, size_x, size_y):
-        items = self.scene.items(QRectF(x, y, size_x, size_y))
-        return items
+    '''
+    
+    interface events: 
+        - retrieving text from input window
+        - key events
+        - dragging, moving, releasing
+    
+    '''
 
-    def check_attack(self, x, y, key):
-        fig2 = self.define_objects_at(x + 38, y + 38, 1, 1)
+    def retrieve_text(self):
+        text = self.addons.text_edit.toPlainText()
+        print("Retrieved text:", text)
+        self.addons.text_edit.clear()
+        self.input_move(text[:2], text[3:])
 
-        color2 = fig2[0].data(Qt.UserRole)[-1]
-        if key[-1] != color2:
-            rect1 = QGraphicsRectItem(x, y, self.slot_w, self.slot_h)
-            color = QColor(utilis.ATTACK_COLOR)
-            rect1.setBrush(color)
-            rect1.setZValue(0)
-            self.scene.addItem(rect1)
-            self.highlights_attack.append(rect1)
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Return or event.key() == Qt.Key_Enter:
+            if self.game.opponent == 'player':
+                self.game.send_data()
 
-    def delete_attacked(self, x, y):
-
-        figures = self.define_objects_at(x + 30, y + 30, 1, 1)
-
-        if self.game.move % 2 == 0:
-            for figure in figures:
-                if figure.data(Qt.UserRole) is None:
-                    pass
-                elif figure.data(Qt.UserRole)[-1] == 'b':
-                    self.scene.removeItem(figure)
-
-        elif self.game.move % 2 == 1:
-            for figure in figures:
-                if figure.data(Qt.UserRole) is None:
-                    pass
-
-                elif figure.data(Qt.UserRole)[-1] == 'w':
-                    self.scene.removeItem(figure)
-
-    def check_mate(self):
-        key = 'kb'
-        if self.game.move % 2 == 0: key = 'kw'
-
-        slot = (0, 0)
-        for row_idx, row in enumerate(self.figures.figures_board):
-            for piece_idx, piece in enumerate(row):
-                if piece == key:
-                    slot = (8 + piece_idx * 75, 8 + row_idx * 75)
-                    break
-
-        for highlight in self.highlights_attack:
-            if highlight.rect().contains(QPointF(*slot)):
-                pass
-
-    def end_game(self):
-        king_w = False
-        king_b = False
-        for row in self.figures.figures_board:
-            for piece in row:
-                if piece == 'kw':
-                    king_w = True
-                elif piece == 'kb':
-                    king_b = True
-        return king_w and king_b
-
-    def check_existance(self, x, y):
-        for rect in self.highlights:
-            if rect.rect().contains(QPointF(x, y)):
-                return True
-
-    def check_attack_exist(self, x, y):
-        if len(self.highlights_attack) == 0: return False
-        for rect in self.highlights_attack:
-            if rect.rect().contains(QPointF(x, y)):
-                return True
-
-    def check_if_empty(self, idx_x, idx_y):
-        if self.figures.figures_board[idx_x][idx_y] is None:
-            return True
+            elif self.game.opponent == 'ai':
+                self.retrieve_text()
         else:
-            return False
+            super().keyPressEvent(event)
 
-    def change_fig_pos(self, fig, idx_x, idx_y):
-        self.figures.figures_board[idx_x][idx_y] = fig
-
-    def convert_pos(self, x, y):
-        pos_x = int(x / self.slot_w) * self.slot_w + 8
-        pos_y = int(y / self.slot_h) * self.slot_h + 8
-        idx_x = int(x / self.slot_w)
-        idx_y = int(y / self.slot_h)
-        return pos_x, pos_y, idx_x, idx_y
 
     def drag(self, event):
         pos = event.scenePos()
@@ -311,7 +180,7 @@ class Window(QGraphicsView):
 
                     self.highlight(item_data, x, y)
                     self.dragging_item = item_clicked
-                    self.change_fig_pos(None, pos_y, pos_x)
+                    self.figures.change_fig_pos(None, pos_y, pos_x)
 
                     self.last_pos = [int(self.dragging_item.x() / self.slot_w),
                                      int(self.dragging_item.y() / self.slot_h)]
@@ -324,7 +193,7 @@ class Window(QGraphicsView):
 
                     self.highlight(item_data, x, y)
                     self.dragging_item = item_clicked
-                    self.change_fig_pos(None, pos_y, pos_x)
+                    self.figures.change_fig_pos(None, pos_y, pos_x)
 
                     self.last_pos = [int(self.dragging_item.x() / self.slot_w),
                                      int(self.dragging_item.y() / self.slot_h)]
@@ -348,24 +217,6 @@ class Window(QGraphicsView):
 
             self.dragging_item.setPos(new_pos)
 
-    def swap(self, x, side):
-        if x != 7 and x != 0:
-            return False
-
-        num1 = 1
-        num2 = 4
-
-        if side == 'r':
-            num1 = 5
-            num2 = 7
-
-        for i in range(num1, num2):
-            if self.figures.figures_board[x][i] is not None: return False
-
-        if self.figures.figures_board[x][0][0] != 'r' or self.figures.figures_board[x][7][0] != 'r':
-            return False
-
-        return True
 
     def release(self, event):
         pos = event.scenePos()
@@ -390,7 +241,7 @@ class Window(QGraphicsView):
                         side = 'l'
 
                     if side != '':
-                        if self.swap(self.last_pos[1], side):
+                        if self.figures.do_castling(self.last_pos[1], side):
                             mov = 0
                             mov_r = 0
                             r_pos = 0
@@ -420,7 +271,7 @@ class Window(QGraphicsView):
 
                 self.dragging_item.setPos(*new_pos)
                 figure = self.dragging_item.data(Qt.UserRole)
-                self.change_fig_pos(figure, pos_y, pos_x)
+                self.figures.change_fig_pos(figure, pos_y, pos_x)
 
                 self.highlight(self.dragging_item.data(Qt.UserRole), x, y)
                 self.check_mate()
@@ -434,6 +285,13 @@ class Window(QGraphicsView):
                 return
 
             self.addons.update_turn()
+
+    '''
+    
+    interface changes:
+        - highlighting
+    
+    '''
 
     def highlight(self, key, x, y):
 
@@ -461,6 +319,180 @@ class Window(QGraphicsView):
 
         if key == "kw" or key == "kb":
             self.execute_king_move(curr_x, curr_y, color, key)
+
+
+    def highlight_rect(self,rect, color):
+        rect.setBrush(color)
+        rect.setZValue(0)
+        self.scene.addItem(rect)
+        self.highlights.append(rect)
+
+    def remove_highlights(self):
+        if len(self.highlights) > 0:
+            for highlight in self.highlights:
+                self.scene.removeItem(highlight)
+            self.highlights = []
+
+        if len(self.highlights_attack) > 0:
+            for highlight in self.highlights_attack:
+                self.scene.removeItem(highlight)
+            self.highlights_attack = []
+
+    def highlight_current(self, x, y, size_w, size_h):
+        color = QColor(utilis.FIG_POS_COLOR)
+        rect_fig = QGraphicsRectItem(x, y, size_w, size_h)
+        rect_fig.setBrush(color)
+        rect_fig.setZValue(0)
+
+        self.scene.addItem(rect_fig)
+        self.highlights.append(rect_fig)
+
+
+    '''
+    
+    game-interface related actions:
+        - defining object at certain position
+        - defining coords of figure on board
+        - checking slot, availability, if it is highlighted
+        - removing figure
+        - checking if position is under attack
+        - moving figures based on instructions from input window
+        
+    '''
+
+
+    def define_objects_at(self, x, y, size_x, size_y):
+        items = self.scene.items(QRectF(x, y, size_x, size_y))
+        return items
+
+    def convert_pos(self, x, y):
+        pos_x = int(x / self.slot_w) * self.slot_w + 8
+        pos_y = int(y / self.slot_h) * self.slot_h + 8
+        idx_x = int(x / self.slot_w)
+        idx_y = int(y / self.slot_h)
+        return pos_x, pos_y, idx_x, idx_y
+
+    def check_if_empty(self, idx_x, idx_y):
+        if self.figures.figures_board[idx_x][idx_y] is None:
+            return True
+        else:
+            return False
+
+    def check_existance(self, x, y):
+        for rect in self.highlights:
+            if rect.rect().contains(QPointF(x, y)):
+                return True
+
+    def delete_attacked(self, x, y):
+
+        figures = self.define_objects_at(x + 30, y + 30, 1, 1)
+
+        if self.game.move % 2 == 0:
+            for figure in figures:
+                if figure.data(Qt.UserRole) is None:
+                    pass
+                elif figure.data(Qt.UserRole)[-1] == 'b':
+                    self.scene.removeItem(figure)
+
+        elif self.game.move % 2 == 1:
+            for figure in figures:
+                if figure.data(Qt.UserRole) is None:
+                    pass
+
+                elif figure.data(Qt.UserRole)[-1] == 'w':
+                    self.scene.removeItem(figure)
+
+    def check_attack(self, x, y, key):
+        fig2 = self.define_objects_at(x + 38, y + 38, 1, 1)
+
+        color2 = fig2[0].data(Qt.UserRole)[-1]
+        if key[-1] != color2:
+            rect1 = QGraphicsRectItem(x, y, self.slot_w, self.slot_h)
+            color = QColor(utilis.ATTACK_COLOR)
+            rect1.setBrush(color)
+            rect1.setZValue(0)
+            self.scene.addItem(rect1)
+            self.highlights_attack.append(rect1)
+
+    def check_attack_exist(self, x, y):
+        if len(self.highlights_attack) == 0: return False
+        for rect in self.highlights_attack:
+            if rect.rect().contains(QPointF(x, y)):
+                return True
+
+    def input_move(self,pos_s, pos_e):
+        x_s,y_s = self.find_pos(pos_s)
+        x_e,y_e = self.find_pos(pos_e)
+
+        if x_s is None and y_s is None: return
+        if x_e is None and y_e is None: return
+
+        if not self.check_if_empty(x_s,y_s) and self.check_if_empty(x_e,y_e):
+            key = self.figures.figures_board[x_s][y_s]
+            if self.game.move%2==0 and key[-1]!='w': return
+            elif self.game.move%2==1 and key[-1]!='b': return
+
+            x,y = y_s*75+8, x_s*75+8
+            self.highlight(key,x,y)
+            xe,ye = y_e*75+8, x_e*75+8
+
+
+            if self.check_existance(xe,ye) or self.check_attack_exist(xe,ye):
+                self.figures.change_fig_pos(None,x_s,y_s)
+                item = self.scene.itemAt(x+30,y+30, self.transform())
+
+                item.setPos(xe,ye)
+                self.figures.change_fig_pos(key,x_e,y_e)
+                self.game.move+=1
+
+            self.remove_highlights()
+
+        elif not self.check_if_empty(x_s,y_s) and not self.check_if_empty(x_e,y_e):
+            key = self.figures.figures_board[x_s][y_s]
+            if self.game.move%2==0 and key[-1]!='w': return
+            elif self.game.move%2==1 and key[-1]!='b': return
+
+            x,y = y_s*75+8, x_s*75+8
+            self.highlight(key,x,y)
+            xe,ye = y_e*75+8, x_e*75+8
+
+            if self.check_existance(xe,ye) or self.check_attack_exist(xe,ye):
+
+                key_e = self.figures.figures_board[x_e][y_e]
+                if key_e is None: return
+                if key_e[-1]!=key[-1]:
+
+                    item_e = self.scene.itemAt(xe + 30, ye + 30, self.transform())
+                    self.scene.removeItem(item_e)
+
+                    self.figures.change_fig_pos(None, x_s, y_s)
+                    item = self.scene.itemAt(x + 30, y + 30, self.transform())
+
+                    item.setPos(xe,ye)
+                    self.figures.change_fig_pos(key,x_e,y_e)
+                    self.game.move+=1
+
+            self.remove_highlights()
+
+
+
+
+
+    def find_pos(self, pos):
+        for i, row in enumerate(self.figures.pos_board):
+            for j, element in enumerate(row):
+                if element == pos:
+                    return i, j
+        return None, None
+
+
+
+    '''
+    
+    game-interface related actions:
+        - all functions with defining what to highlight: attacks and moves
+    
+    '''
 
     def execute_pawn_move(self,curr_x,curr_y,color,key):
         moves, attacks = self.figures.define_pawn_moves(self.slots, curr_x, curr_y, key)
@@ -521,28 +553,19 @@ class Window(QGraphicsView):
                     self.check_attack(move_x * self.slot_w, move_y * self.slot_h, key)
                     break
 
-    def highlight_rect(self,rect, color):
-        rect.setBrush(color)
-        rect.setZValue(0)
-        self.scene.addItem(rect)
-        self.highlights.append(rect)
 
-    def remove_highlights(self):
-        if len(self.highlights) > 0:
-            for highlight in self.highlights:
-                self.scene.removeItem(highlight)
-            self.highlights = []
+    def check_mate(self):
+        key = 'kb'
+        if self.game.move % 2 == 0: key = 'kw'
 
-        if len(self.highlights_attack) > 0:
-            for highlight in self.highlights_attack:
-                self.scene.removeItem(highlight)
-            self.highlights_attack = []
+        slot = (0, 0)
+        for row_idx, row in enumerate(self.figures.figures_board):
+            for piece_idx, piece in enumerate(row):
+                if piece == key:
+                    slot = (8 + piece_idx * 75, 8 + row_idx * 75)
+                    break
 
-    def highlight_current(self, x, y, size_w, size_h):
-        color = QColor(utilis.FIG_POS_COLOR)
-        rect_fig = QGraphicsRectItem(x, y, size_w, size_h)
-        rect_fig.setBrush(color)
-        rect_fig.setZValue(0)
+        for highlight in self.highlights_attack:
+            if highlight.rect().contains(QPointF(*slot)):
+                pass
 
-        self.scene.addItem(rect_fig)
-        self.highlights.append(rect_fig)

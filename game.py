@@ -53,8 +53,6 @@ class Game:
             except Exception: pass
 
 
-
-
     def manage_communication(self):
         if self.opponent == 'player':
             if self.status_tcpip == 'client':
@@ -86,8 +84,6 @@ class Game:
                 print("c send")
 
 
-
-
     def receive_data(self, connection, client):
         if self.opponent == 'player':
             if self.status_tcpip == 'server':
@@ -113,6 +109,16 @@ class Game:
                     self.window.input_move(data[:2], data[3:])
 
 
+    def end_game(self):
+        king_w = False
+        king_b = False
+        for row in self.window.figures.figures_board:
+            for piece in row:
+                if piece == 'kw':
+                    king_w = True
+                elif piece == 'kb':
+                    king_b = True
+        return king_w and king_b
 
     def ai_move(self):
         if self.opponent!='player':
