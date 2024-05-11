@@ -1,7 +1,12 @@
+import json
 import socket
+import sqlite3
 import threading
 from queue import Queue
 import random
+
+import xml.etree.ElementTree as ET
+from datetime import datetime
 
 STOP = False
 
@@ -27,6 +32,7 @@ class Game:
         self.move = 0
         self.save = [""]
         self.game_history = [""]
+        self.last_db = ""
 
 
 
@@ -140,4 +146,56 @@ class Game:
                     self.window.input_move(random_x, random_y)
                 elif num <=2:
                     self.window.input_move(random_x, random_y)
+
+    def save_to_json(self):
+        data = {
+                "opponent": self.opponent,
+                "ip": self.ip,
+                "port": self.port,
+                "mode": self.max_time}
+
+        with open("gameplay_config.json", "w") as file:
+            json.dump(data, file)
+
+    def save_to_xml(self):
+        with open("gameplay.xml", "w") as xml_file:
+
+            game_element = ET.Element("last game")
+            for move in self.game_history[1:]:
+                move_element = ET.SubElement(game_element, "move")
+                sub_element = ET.SubElement(move_element, move[:2])
+                sub_element.text = move[3:]
+
+            xml_file.write(ET.tostring(game_element, encoding="unicode", method="xml"))
+
+
+    def save_to_sql(self):
+        try:
+            conn = sqlite3.connect('gameplay.db')
+            cursor = conn.cursor()
+            date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            table_name = f'gameplay_{date.replace("-", "_").replace(":", "_").replace(" ", "_")}'
+            self.last_db = table_name
+            create_table_query = f'''
+            CREATE TABLE IF NOT EXISTS {table_name} (
+                id INTEGER PRIMARY KEY,
+                white TEXT,
+                black TEXT
+            )'''
+
+            cursor.execute(create_table_query)
+
+            for value in self.game_history[1:]:
+                if value[1] == 'w':
+                    cursor.execute(f"INSERT INTO {table_name} (white, black) VALUES (?,?)", (value[4:],''))
+                if value[1] == 'b':
+                    cursor.execute(f"INSERT INTO {table_name} (white, black) VALUES (?,?)", ('',value[4:]))
+            conn.commit()
+            conn.close()
+
+            print("saved")
+
+        except sqlite3.Error as e:
+            print('error', e)
+
 

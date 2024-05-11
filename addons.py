@@ -1,6 +1,4 @@
-import json
 import random
-from datetime import datetime
 import time
 from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QColor, QFont, QPainterPath, QRegion, QPixmap, QImage
@@ -10,7 +8,6 @@ from PyQt5.QtWidgets import QLabel, QPushButton, QGraphicsEllipseItem, QGraphics
 
 import utilis
 import sqlite3
-import xml.etree.ElementTree as ET
 
 
 class Addons:
@@ -19,7 +16,6 @@ class Addons:
         self.save = self.window.game.save
         self.queue = self.window.game.queue
         self.scene = self.window.scene
-        self.last_db = ""
         self.is_loaded = False
 
 
@@ -278,9 +274,9 @@ class Addons:
         self.mode5_button.resize(120, 60)
         self.mode6_button.resize(120, 60)
 
-        self.mode4_button.clicked.connect(self.save_sql)
-        self.mode5_button.clicked.connect(self.save_xml)
-        self.mode6_button.clicked.connect(self.save_json)
+        self.mode4_button.clicked.connect(self.window.game.save_to_sql)
+        self.mode5_button.clicked.connect(self.window.game.save_to_xml)
+        self.mode6_button.clicked.connect(self.window.game.save_to_json)
 
         self.mode4_button.move(100, 100)
         self.mode5_button.move(250, 100)
@@ -306,57 +302,6 @@ class Addons:
 
         self.window.setStyleSheet(utilis.STYLE_BUTTON)
 
-    def save_sql(self):
-        try:
-            conn = sqlite3.connect('gameplay.db')
-            cursor = conn.cursor()
-            date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            table_name = f'gameplay_{date.replace("-", "_").replace(":", "_").replace(" ", "_")}'
-            self.last_db = table_name
-            create_table_query = f'''
-            CREATE TABLE IF NOT EXISTS {table_name} (
-                id INTEGER PRIMARY KEY,
-                white TEXT,
-                black TEXT
-            )'''
-
-            cursor.execute(create_table_query)
-
-            for value in self.window.game.game_history[1:]:
-                if value[1] == 'w':
-                    cursor.execute(f"INSERT INTO {table_name} (white, black) VALUES (?,?)", (value[4:],''))
-                if value[1] == 'b':
-                    cursor.execute(f"INSERT INTO {table_name} (white, black) VALUES (?,?)", ('',value[4:]))
-            conn.commit()
-            conn.close()
-
-            print("saved")
-
-        except sqlite3.Error as e:
-            print('error', e)
-
-
-    def save_xml(self):
-        with open("gameplay.xml", "w") as xml_file:
-
-            game_element = ET.Element("last game")
-            for move in self.window.game.game_history[1:]:
-                move_element = ET.SubElement(game_element, "move")
-                sub_element = ET.SubElement(move_element, move[:2])
-                sub_element.text = move[3:]
-
-            xml_file.write(ET.tostring(game_element, encoding="unicode", method="xml"))
-
-
-    def save_json(self):
-        data = {
-                "opponent": self.window.game.opponent,
-                "ip": self.window.game.ip,
-                "port": self.window.game.port,
-                "mode": self.window.game.max_time}
-
-        with open("gameplay_config.json", "w") as file:
-            json.dump(data, file)
 
 
     def configuration_window(self):
